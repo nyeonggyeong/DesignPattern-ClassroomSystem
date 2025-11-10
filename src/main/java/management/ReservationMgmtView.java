@@ -8,22 +8,20 @@ import calendar.CalendarController;
 import calendar.ReservationRepositoryModel;
 import calendar.ReservationServiceModel;
 import java.io.IOException;
-import management.ReservationMgmtController;
+import java.util.ArrayList;
 import java.util.List;
-import javax.swing.table.DefaultTableModel;
-import management.ReservationMgmtModel;
-import management.NotificationController;
-import visualization.MainView;
-import visualization.ReservationModel;
-import visualization.ReservationController;
-
-import javax.swing.JOptionPane;
-import javax.swing.JComboBox;
 import javax.swing.DefaultCellEditor;
+import javax.swing.JComboBox;
+import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
+import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
+import java.beans.PropertyChangeListener;
 import rulemanagement.RuleManagementController;
+import visualization.MainView;
+import visualization.ReservationController;
+import visualization.ReservationModel;
 
 /**
  *
@@ -31,7 +29,23 @@ import rulemanagement.RuleManagementController;
  */
 public class ReservationMgmtView extends javax.swing.JFrame {
 
-    private NotificationController notificationController = new NotificationController();
+    private final List<ReservationMgmtModel> currentModels = new ArrayList<>();
+    private final NotificationController notificationController = new NotificationController();
+    private final ReservationMgmtController controller = new ReservationMgmtController();
+    private boolean suppressTableListener = false;
+    private boolean isApplyingApproval = false;
+
+    private final PropertyChangeListener modelListener = evt -> {
+        if (!"approvalChanged".equals(evt.getPropertyName())) {
+            return;
+        }
+        SwingUtilities.invokeLater(() -> {
+            ReservationMgmtModel src = (ReservationMgmtModel) evt.getSource();
+            String newStatus = String.valueOf(evt.getNewValue());
+            String oldStatus = String.valueOf(evt.getOldValue());
+            updateReservationRowFromModel(src.getStudentId(), newStatus, oldStatus);
+        });
+    };
 
     public ReservationMgmtView() {
         initComponents();
@@ -40,11 +54,8 @@ public class ReservationMgmtView extends javax.swing.JFrame {
         loadReservationData();
         setTitle("관리자 예약 목록");
         setLocationRelativeTo(null);
-
         notificationController.startMonitoring();
     }
-
-    private ReservationMgmtController controller = new ReservationMgmtController();
 
     public ReservationMgmtView(String userId) {
         initComponents();
@@ -62,30 +73,88 @@ public class ReservationMgmtView extends javax.swing.JFrame {
 
     private void setupTableListener() {
         jTable1.getModel().addTableModelListener(e -> {
+            if (suppressTableListener) {
+                return;
+            }
+
             int row = e.getFirstRow();
             int column = e.getColumn();
+            if (row < 0 || column < 0 || column != 6 || isApplyingApproval) {
+                return;
+            }
 
-            if (column == 6) {
-                String studentId = (String) jTable1.getValueAt(row, 2); // 학번으로 대상 찾기
-                String newStatus = (String) jTable1.getValueAt(row, 6);
+            String studentId = String.valueOf(jTable1.getValueAt(row, 2));
+            String newStatus = String.valueOf(jTable1.getValueAt(row, 6));
 
-                controller.updateApprovalStatus(studentId, newStatus);
+            try {
+                isApplyingApproval = true;
+                controller.updateApprovalStatus(studentId, newStatus);  // 이벤트만 발생
+            } finally {
+                isApplyingApproval = false;
             }
         });
     }
 
     private void loadReservationData() {
-        List<ReservationMgmtModel> reservations = controller.getAllReservations();
-        DefaultTableModel model = (DefaultTableModel) jTable1.getModel();
-        model.setRowCount(0); // 기존 데이터 초기화
+        suppressTableListener = true;
+        try {
+            // 1) 기존 모델 리스너 정리
+            for (var m : currentModels) {
+                m.removeListener(modelListener);
+            }
+            currentModels.clear();
 
-        for (ReservationMgmtModel r : reservations) {
-            model.addRow(new Object[]{
-                r.getName(), r.getDepartment(), r.getStudentId(),
-                r.getRoom(), r.getDate(), r.getTime(), r.getApproved()
-            });
+            // 2) 컨트롤러에서 모델 리스트 가져오기 (동일 인스턴스가 캐시에 재사용됨)
+            List<ReservationMgmtModel> reservations = controller.getAllReservations();
+
+            // 3) 테이블 갱신
+            DefaultTableModel model = (DefaultTableModel) jTable1.getModel();
+            model.setRowCount(0);
+            for (ReservationMgmtModel r : reservations) {
+                model.addRow(new Object[]{
+                    r.getName(), r.getDepartment(), r.getStudentId(),
+                    r.getRoom(), r.getDate(), r.getTime(), r.getApproved()
+                });
+            }
+
+            // 4) 각 모델에 옵저버 등록
+            for (ReservationMgmtModel r : reservations) {
+                r.addListener(modelListener);
+                currentModels.add(r);
+            }
+        } finally {
+            suppressTableListener = false;
         }
+    }
 
+    private void updateReservationRowFromModel(String studentId, String newStatus, String oldStatus) {
+        DefaultTableModel model = (DefaultTableModel) jTable1.getModel();
+        suppressTableListener = true;
+        try {
+            for (int i = 0; i < model.getRowCount(); i++) {
+                String sid = String.valueOf(model.getValueAt(i, 2));
+                if (studentId.equals(sid)) {
+                    model.setValueAt(newStatus, i, 6);
+                    JOptionPane.showMessageDialog(
+                            this,
+                            "학번 " + studentId + " 승인 상태: " + newStatus,
+                            "승인 결과", JOptionPane.INFORMATION_MESSAGE
+                    );
+                    break;
+                }
+            }
+        } finally {
+            suppressTableListener = false;
+        }
+    }
+
+    @Override
+    public void dispose() {
+        for (var m : currentModels) {
+            m.removeListener(modelListener);
+        }
+        currentModels.clear();
+        super.dispose();
     }
 
     /**
@@ -349,12 +418,14 @@ public class ReservationMgmtView extends javax.swing.JFrame {
         String studentId = (String) jTable1.getValueAt(selectedRow, 2);
         controller.banUser(studentId);
         JOptionPane.showMessageDialog(this, studentId + " 사용자가 제한되었습니다.");
+        loadReservationData(); 
     }//GEN-LAST:event_jButton6ActionPerformed
 
     private void jButton7ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton7ActionPerformed
         String studentId = JOptionPane.showInputDialog(this, "해제할 사용자의 학번을 입력하세요.");
         if (studentId != null && !studentId.isEmpty()) {
             controller.unbanUser(studentId);
+            loadReservationData();
         }
     }//GEN-LAST:event_jButton7ActionPerformed
 

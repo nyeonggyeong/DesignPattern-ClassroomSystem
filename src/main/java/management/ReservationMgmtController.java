@@ -11,6 +11,9 @@ import java.util.ArrayList;
 import java.io.*;
 import java.util.List;
 import javax.swing.JOptionPane;
+import java.beans.PropertyChangeListener;
+import java.beans.PropertyChangeSupport;
+import java.nio.charset.StandardCharsets;
 
 /**
  *
@@ -21,27 +24,49 @@ public class ReservationMgmtController {
     private static final String FILE_PATH = "src/main/resources/reservation.txt";
     private static final String BAN_LIST_FILE = "src/main/resources/banlist.txt";
 
+    public static final String EVT_RESERVATIONS = "reservations";
+
+    private final PropertyChangeSupport pcs = new PropertyChangeSupport(this);
+    private final java.util.Map<String, ReservationMgmtModel> modelCache = new java.util.HashMap<>();
+
+    public void addListener(PropertyChangeListener l) {
+        pcs.addPropertyChangeListener(l);
+    }
+
+    public void removeListener(PropertyChangeListener l) {
+        pcs.removePropertyChangeListener(l);
+    }
+
     public List<ReservationMgmtModel> getAllReservations() {
         List<ReservationMgmtModel> reservations = new ArrayList<>();
 
-        try (BufferedReader reader = new BufferedReader(new FileReader(FILE_PATH))) {
-            String line;
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(FILE_PATH), StandardCharsets.UTF_8))) {
 
+            String line;
             while ((line = reader.readLine()) != null) {
                 String[] data = line.split(",");
                 if (data.length >= 12) {
-                    reservations.add(new ReservationMgmtModel(
-                            data[0], // name
-                            data[2], // studentId
-                            data[3], // department
-                            data[4], // room
-                            data[6], // date
-                            data[8] + "~" + data[9], // time
-                            data[11] // approved
-                    ));
+                    String name = data[0];
+                    String studentId = data[2];
+                    String department = data[3];
+                    String room = data[4];
+                    String date = data[6];
+                    String time = data[8] + "~" + data[9];
+                    String approved = data[11];
+
+                    ReservationMgmtModel m = modelCache.get(studentId);
+                    if (m == null) {
+                        m = new ReservationMgmtModel(name, studentId, department, room, date, time, approved);
+                        modelCache.put(studentId, m);
+                    } else {
+
+                        m.setApproved(approved);
+                    }
+
+                    reservations.add(m);
                 }
             }
-
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -51,25 +76,30 @@ public class ReservationMgmtController {
 
     public void updateApprovalStatus(String studentId, String newStatus) {
         List<String> updatedLines = new ArrayList<>();
+        boolean found = false;
 
-        try (BufferedReader reader = new BufferedReader(new FileReader(FILE_PATH))) {
+        // [KEEP] 파일 읽기/라인 업데이트
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(FILE_PATH), StandardCharsets.UTF_8))) {
+
             String line;
-
             while ((line = reader.readLine()) != null) {
                 String[] data = line.split(",");
                 if (data.length >= 12 && data[2].equals(studentId)) {
                     data[11] = newStatus;
+                    found = true;
                     updatedLines.add(String.join(",", data));
                 } else {
                     updatedLines.add(line);
                 }
             }
-
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(FILE_PATH))) {
+        // [KEEP] 파일 쓰기
+        try (BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(FILE_PATH, false), StandardCharsets.UTF_8))) {
             for (String updatedLine : updatedLines) {
                 writer.write(updatedLine);
                 writer.newLine();
@@ -78,15 +108,26 @@ public class ReservationMgmtController {
             e.printStackTrace();
         }
 
-        JOptionPane.showMessageDialog(null,
-                "학번 " + studentId + "의 승인 여부가 '" + newStatus + "'(으)로 변경되었습니다.",
-                "승인 결과",
-                JOptionPane.INFORMATION_MESSAGE);
+        if (found) {
+            ReservationMgmtModel model = modelCache.get(studentId);
+            if (model != null) {
+                model.setApproved(newStatus); // Model이 Subject로서 이벤트 발행
+            } else {
+                // 캐시에 없으면 재로딩으로 동기화
+                getAllReservations();
+            }
+        }
     }
 
     public List<String> getBannedUsers() {
         List<String> bannedUsers = new ArrayList<>();
-        try (BufferedReader reader = new BufferedReader(new FileReader(BAN_LIST_FILE))) {
+        File f = new File(BAN_LIST_FILE);
+        if (!f.exists()) {
+            return bannedUsers;
+        }
+
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 bannedUsers.add(line.trim());
@@ -102,31 +143,24 @@ public class ReservationMgmtController {
         if (!bannedUsers.contains(studentId)) {
             bannedUsers.add(studentId);
             saveBannedUsers(bannedUsers);
+            pcs.firePropertyChange(EVT_RESERVATIONS, null, null);
         }
     }
 
     public void unbanUser(String studentId) {
         List<String> bannedUsers = getBannedUsers();
-
         if (!bannedUsers.contains(studentId)) {
-            JOptionPane.showMessageDialog(null,
-                    "제한된 사용자 목록에 없는 학번입니다: " + studentId,
-                    "알림",
-                    JOptionPane.WARNING_MESSAGE);
+            // 팝업은 View에서 띄우도록 유지
             return;
         }
-
         bannedUsers.remove(studentId);
         saveBannedUsers(bannedUsers);
-
-        JOptionPane.showMessageDialog(null,
-                "학번 " + studentId + "의 예약 제한이 해제되었습니다.",
-                "알림",
-                JOptionPane.INFORMATION_MESSAGE);
+        pcs.firePropertyChange(EVT_RESERVATIONS, null, null);
     }
 
     private void saveBannedUsers(List<String> bannedUsers) {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(BAN_LIST_FILE))) {
+        try (BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(BAN_LIST_FILE, false), StandardCharsets.UTF_8))) {
             for (String id : bannedUsers) {
                 writer.write(id);
                 writer.newLine();
