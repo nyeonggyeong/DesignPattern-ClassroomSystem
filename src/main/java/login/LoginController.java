@@ -114,7 +114,8 @@ public class LoginController {
                 try {
                     if ("admin".equalsIgnoreCase(role)) {
                         UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
-                        new ReservationMgmtView().setVisible(true);
+                        // 생성자에 in, out 객체 전달
+                        new ReservationMgmtView(in, out).setVisible(true);
                     } else {
                         new RuleAgreementController(userId, userType, socket, out);
                     }

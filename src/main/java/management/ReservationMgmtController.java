@@ -15,12 +15,37 @@ import javax.swing.JOptionPane;
 /**
  *
  * @author suk22
+ * 
  */
 public class ReservationMgmtController {
 
     private static final String FILE_PATH = "src/main/resources/reservation.txt";
     private static final String BAN_LIST_FILE = "src/main/resources/banlist.txt";
-
+    private static final String ALL_FILES_DIR = "src/main/resources/";
+    private BufferedWriter out;
+    private BufferedReader in;
+    
+    // 테스트용 기본 생성자
+    public ReservationMgmtController() {}
+    public ReservationMgmtController(BufferedReader in, BufferedWriter out) {
+        this.in = in;
+        this.out = out;
+    }
+    
+    public void saveAllFiles() {
+        String fileName = "";
+        File files = new File(ALL_FILES_DIR);
+        
+        File[] fileList = files.listFiles();
+        
+        for (File file : fileList) {
+            if (file.isFile()) {
+                fileName = file.getName();
+                System.out.println("fileName: " + fileName);
+            }
+        }
+    }
+    
     public List<ReservationMgmtModel> getAllReservations() {
         List<ReservationMgmtModel> reservations = new ArrayList<>();
 
@@ -165,5 +190,4 @@ public class ReservationMgmtController {
 
         return filtered;
     }
-
 }
