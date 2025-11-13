@@ -22,7 +22,10 @@ import javax.swing.JTextField;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+<<<<<<< HEAD
 import org.junit.jupiter.api.Disabled;
+=======
+>>>>>>> 515b6c9566f2d3d10fa02317d91c3b890a906328
 import org.junit.jupiter.api.io.TempDir;
 
 class RuleManagementControllerTest {
@@ -61,7 +64,10 @@ class RuleManagementControllerTest {
     }
 
     @Test
+<<<<<<< HEAD
     @Disabled // 임시 코드
+=======
+>>>>>>> 515b6c9566f2d3d10fa02317d91c3b890a906328
     void testAddButtonAction() throws Exception {
         // 리플렉션으로 private JTextField newRuleField 꺼내 세팅
         Field tfField = RuleManagementView.class.getDeclaredField("newRuleField");
@@ -79,7 +85,10 @@ class RuleManagementControllerTest {
     }
 
     @Test
+<<<<<<< HEAD
     @Disabled //임시코드
+=======
+>>>>>>> 515b6c9566f2d3d10fa02317d91c3b890a906328
     void testDeleteButtonAction() throws IOException {
         // 모델에 직접 추가 & 뷰 갱신
         model.addRule("toDelete");

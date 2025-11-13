@@ -4,11 +4,19 @@
  */
 package management;
 
+import java.beans.PropertyChangeListener;
+import java.beans.PropertyChangeSupport;
+
+
 /**
  *
  * @author suk22
  */
 public class ReservationMgmtModel {
+
+    
+    private final PropertyChangeSupport pcs = new PropertyChangeSupport(this);
+
 
     private String name;
     private String studentId;
@@ -27,6 +35,16 @@ public class ReservationMgmtModel {
         this.time = time;
         this.approved = approved;
     }
+
+
+    public void addListener(PropertyChangeListener l) {
+        pcs.addPropertyChangeListener(l);
+    }
+
+    public void removeListener(PropertyChangeListener l) {
+        pcs.removePropertyChangeListener(l);
+    }
+
 
     public String getName() {
         return name;
@@ -57,6 +75,13 @@ public class ReservationMgmtModel {
     }
 
     public void setApproved(String approved) {
+
+        String old = this.approved;
+        if ((old == null && approved == null) || (old != null && old.equals(approved))) {
+            return;
+        }
         this.approved = approved;
+       pcs.firePropertyChange("approvalChanged", old, approved);
     }
+
 }

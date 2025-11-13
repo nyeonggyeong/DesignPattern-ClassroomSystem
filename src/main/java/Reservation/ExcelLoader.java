@@ -63,6 +63,6 @@ public class ExcelLoader {
             default -> "";
         };
     }
-    
+
 }
 

@@ -1,5 +1,6 @@
 /target/
 /nbproject/
+<<<<<<< HEAD
 .mvn
 mvnw
 mvnw.*
@@ -35,3 +36,5 @@ hs_err_pid*
 replay_pid*
 
 # End of https://www.toptal.com/developers/gitignore/api/java
+=======
+>>>>>>> 515b6c9566f2d3d10fa02317d91c3b890a906328

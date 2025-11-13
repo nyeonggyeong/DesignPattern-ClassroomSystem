@@ -4,7 +4,6 @@ import ServerClient.LogoutUtil;
 import UserFunction.UserMainController;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.junit.jupiter.api.Disabled;
 
 import java.io.*;
 import java.util.*;
@@ -23,7 +22,8 @@ import java.text.SimpleDateFormat;
  * - View(ReservationView)와 연결하여 사용자와 상호작용
  * - 서버와의 통신(Socket, BufferedReader/Writer) 연동
  */
-@Disabled
+
+
 public class ReservationGUIController {
 
     private ReservationView view; // 사용자 인터페이스 뷰 (GUI)

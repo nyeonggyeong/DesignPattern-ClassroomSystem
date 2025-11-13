@@ -20,6 +20,7 @@ public class LoginView extends JFrame {
     private JPasswordField passwordField = new JPasswordField(15);
     private JRadioButton userRadio = new JRadioButton("사용자", true);
     private JRadioButton professor = new JRadioButton("교수");
+
     private JRadioButton adminRadio = new JRadioButton("관리자");
     private JButton loginButton = new JButton("로그인");
     private JButton registerButton = new JButton("회원가입");
@@ -47,6 +48,7 @@ public class LoginView extends JFrame {
 
         ButtonGroup group = new ButtonGroup();
         group.add(userRadio);
+
         group.add(professor);
         group.add(adminRadio);
 
