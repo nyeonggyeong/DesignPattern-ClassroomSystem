@@ -52,6 +52,7 @@ public class SignupController {
         String name = view.getName();
         String dept = view.getDept();
         String role = view.getRole(); // 예: “USER” 또는 “ADMIN”
+        System.out.println("역할: " + role);
 
         // 빈칸 체크
         if (id.isEmpty() || pw.isEmpty() || name.isEmpty() || dept.isEmpty()) {

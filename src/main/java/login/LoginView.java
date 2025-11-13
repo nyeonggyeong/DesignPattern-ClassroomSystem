@@ -4,6 +4,13 @@
  */
 package login;
 
+/**
+ *
+ * @author 염승욱
+ * @modify 교수 로그인 버튼 생성, 교수 화면 분기
+ * @since 2025-11-11
+ */
+
 import javax.swing.*;
 import java.awt.*;
 
@@ -12,6 +19,7 @@ public class LoginView extends JFrame {
     private JTextField userIdField = new JTextField(15);
     private JPasswordField passwordField = new JPasswordField(15);
     private JRadioButton userRadio = new JRadioButton("사용자", true);
+    private JRadioButton professor = new JRadioButton("교수");
     private JRadioButton adminRadio = new JRadioButton("관리자");
     private JButton loginButton = new JButton("로그인");
     private JButton registerButton = new JButton("회원가입");
@@ -29,8 +37,9 @@ public class LoginView extends JFrame {
         userIdField.setBounds(80, 30, 180, 30);
         passwordField.setBounds(80, 70, 180, 30);
         loginButton.setBounds(80, 145, 80, 30);
-        userRadio.setBounds(80, 110, 80, 20);
-        adminRadio.setBounds(160, 110, 80, 20);
+        userRadio.setBounds(80, 110, 70, 20);
+        professor.setBounds(150, 110, 60, 20);
+        adminRadio.setBounds(210, 110, 70, 20);
         registerButton.setBounds(170, 145, 85, 30);
         findPasswordButton.setBounds(80, 185, 175, 30);
         labelId.setBounds(50, 30, 80, 30); // ID: 라벨 위치 지정
@@ -38,12 +47,14 @@ public class LoginView extends JFrame {
 
         ButtonGroup group = new ButtonGroup();
         group.add(userRadio);
+        group.add(professor);
         group.add(adminRadio);
 
         add(userIdField);
         add(passwordField);
         add(loginButton);
         add(userRadio);
+        add(professor);
         add(adminRadio);
         add(registerButton);
         add(findPasswordButton); // 비밀번호 찾기/변경 버튼 추가
@@ -60,7 +71,13 @@ public class LoginView extends JFrame {
     }
 
     public String getRole() {
-        return userRadio.isSelected() ? "user" : "admin";
+        if (professor.isSelected()) {
+            return "professor";
+        } else if (userRadio.isSelected()) {
+            return "user";
+        } else {
+            return "admin";
+        }
     }
 
     public JButton getLoginButton() {
