@@ -27,9 +27,8 @@ import visualization.ReservationModel;
 
 /**
  *
- * @author suk22 <<<<<<< HEAD
- * @a
- * uthor 염승욱
+ * @author suk22
+ * @author 염승욱
  * @since 2025-11-10
  * @modified 백업 버튼 및 기능 추가
  */
