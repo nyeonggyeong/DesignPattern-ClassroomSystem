@@ -9,32 +9,55 @@ package Reservation;
  * @author scq37
  */
 public class RoomModel {
-      private String name;    //강의실 이름
-    private String type;            //강의실 번호
-    private String[] availableTimes;        //예약가능 시간
-    
+
+    private String type;            //강의실 실습실
+    private String building; // 건물
+    private String floor; // 층
+    private String roomNumber; // 호수
+    private String fullName;
+
     /*
     public Room() {
         this.name = "강의실";
         this.type
         this()
     }
-    */
-    public RoomModel(String name, String type, String[] availableTimes) {
-        this.name = name;
-        this.type = type;
-        this.availableTimes = availableTimes;
+     */
+//    public RoomModel(String name, String type, String[] availableTimes) {
+//        this.name = name;
+//        this.type = type;
+//        this.availableTimes = availableTimes;
+//    }
+//    
+    public RoomModel(String roomNumber, String type, String[] timeSlots) {
+        this("정보관", "9", roomNumber, type);
     }
-
+    
+    public RoomModel(String building, String floor, String roomNumber, String type) {
+        this.building = building;
+        this.floor = floor;
+        this.roomNumber = roomNumber;
+        this.type = type;
+        this.fullName = String.format("%s-%s층-%s호", building, floor, roomNumber);
+    }
+    
+    public String getBuilding() { return building; }
+    
+    public String getFloor() { return floor;}
+    
+    public String getRoomNumber() { return roomNumber; }
+    
+    public String getFullName() {return fullName; }
+    
     public String getName() {
-        return name;
+        return roomNumber;
     }
 
     public String getType() {
         return type;
     }
-
-    public String[] getAvailableTimes() {
-        return availableTimes;
-    }
+    
+    @Override
+    public String toString() { return fullName; }
+    
 }

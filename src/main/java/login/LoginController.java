@@ -20,7 +20,8 @@ public class LoginController {
     private final Socket socket;
     private final BufferedWriter out;
     private final BufferedReader in;
-
+//    private Thread listener; //알람 수신 스레드
+    
     public LoginController(LoginView view, LoginModel model) {
         this.view = view;
         this.model = model;
@@ -110,7 +111,9 @@ public class LoginController {
                         userType = parts[3];
                     }
                 }
-
+                
+                checkCancelNotification();
+                
                 try {
                     if ("admin".equalsIgnoreCase(role)) {
                         UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
@@ -120,6 +123,8 @@ public class LoginController {
 
                     } else {
                         new RuleAgreementController(userId, userType, socket, out);
+//                        notificationListener();
+                        pollingNotification();
                     }
                     view.dispose();
                 } catch (Exception ex) {
@@ -146,6 +151,10 @@ public class LoginController {
                         String name = "알수없음";
                         String dept = "미지정";
                         String userType = role;
+                        
+                    
+
+                        checkCancelNotification();
 
                         // ✅ 여기서 EDT로 새 창 띄우고 기존 창 닫기
                         SwingUtilities.invokeLater(() -> {
@@ -153,6 +162,8 @@ public class LoginController {
                                 RuleAgreementController rac
                                         = new RuleAgreementController(userId, userType, socket, out);
                                 rac.showView();
+//                                notificationListener();
+                                pollingNotification();
                             } catch (Exception ex) {
                                 ex.printStackTrace();
                                 JOptionPane.showMessageDialog(view,
@@ -180,5 +191,63 @@ public class LoginController {
         new SignupController(signupView, signupModel);
         signupView.setVisible(true);
     }
-
+    
+    public void checkCancelNotification() {
+        try {
+            while (in.ready()) {
+                String message = in.readLine();
+                if (message != null && message.startsWith("CANCEL_NOTIFICATION:")) {
+                    String data = message.substring("CANCEL_NOTIFICATION:".length());
+                    showNotification(data);
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("에러: " + e.getMessage());
+        }
+    }
+    //"%s,%s,%s,%s-%s",name,id,room,startTime,endTime
+    public void showNotification(String data) {
+        if (data != null && !data.isEmpty()) {
+            String[] notifications = data.split(";");
+            
+            StringBuilder sb = new StringBuilder();
+            sb.append("교수님의 예약으로 인해 다음 예약이 취소되었습니다.\n");
+            for (String notification : notifications) {
+                String[] parts = notification.split(",");
+                sb.append(String.format("%s님의 %s\n",parts[0],parts[2]));
+                sb.append(String.format("시간: %s",parts[3]));
+            }
+            JOptionPane.showMessageDialog(null, sb.toString(), "예약 취소 알림",JOptionPane.WARNING_MESSAGE);
+            
+        }
+    }
+    
+    private void pollingNotification() {
+        int delay = 5000;
+        
+        Timer timer = new Timer(delay, e-> {
+            checkCancelNotification();
+        });
+        
+        timer.setRepeats(true);
+        timer.start();
+    }
+    
+//    private void notificationListener() {
+//        listener = new Thread(() -> {
+//            try {
+//                String msg;
+//                while ((msg = in.readLine()) != null) {
+//                    if(msg.startsWith("CANCEL_NOTIFICATION:")) {
+//                        String data = msg.substring("CANCEL_NOTIFICATION:".length());
+//                        showNotification(data);
+//                    }
+//                }
+//            } catch (IOException e) {
+//                System.out.println("에러: " + e.getMessage());
+//            }
+//        });
+//        listener.setDaemon(true);
+//        listener.start();
+//    }
 }

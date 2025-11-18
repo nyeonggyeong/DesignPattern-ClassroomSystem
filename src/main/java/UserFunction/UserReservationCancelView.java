@@ -25,6 +25,7 @@ public class UserReservationCancelView extends JDialog {
     }
     
     private void initComponents() {
+        setTitle("내 예약 현황");
         setSize(400, 300);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
