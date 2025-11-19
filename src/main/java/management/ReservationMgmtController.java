@@ -17,16 +17,14 @@ import java.nio.charset.StandardCharsets;
 
 /**
  *
- * @author suk22  <<<<<<< HEAD
- *
- * =======
- * >>>>>>> 515b6c9566f2d3d10fa02317d91c3b890a906328
+ * @author suk22
  */
 public class ReservationMgmtController {
 
     private static final String FILE_PATH = "src/main/resources/reservation.txt";
     private static final String BAN_LIST_FILE = "src/main/resources/banlist.txt";
     private static final String ALL_FILES_DIR = "src/main/resources/";
+    private static final String APPROVAL_NOTIFY_FILE = "src/main/resources/approval_notify.txt";
     private BufferedWriter out;
     private BufferedReader in;
 
@@ -140,10 +138,29 @@ public class ReservationMgmtController {
             ReservationMgmtModel model = modelCache.get(studentId);
             if (model != null) {
                 model.setApproved(newStatus); // Model이 Subject로서 이벤트 발행
+                appendApprovalNotification(model);
             } else {
                 // 캐시에 없으면 재로딩으로 동기화
                 getAllReservations();
             }
+        }
+    }
+
+    private void appendApprovalNotification(ReservationMgmtModel m) {
+        // 포맷: 학번,승인여부,날짜,강의실
+        String line = String.join(",",
+                m.getStudentId(),
+                m.getApproved(),
+                m.getDate(),
+                m.getRoom()
+        );
+
+        try (BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(APPROVAL_NOTIFY_FILE, true), StandardCharsets.UTF_8))) {
+            writer.write(line);
+            writer.newLine();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 

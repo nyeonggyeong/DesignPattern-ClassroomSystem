@@ -17,6 +17,7 @@ import Reservation.ReservationGUIController;
 import Reservation.ReservationView;
 
 public class UserMainController {
+
     private UserMainModel model;
     private UserMainView view;
 
@@ -26,62 +27,73 @@ public class UserMainController {
     private BufferedReader in;
     private BufferedWriter out;
 
+    private ApprovalNotificationController approvalNotificationController;
+
     public UserMainController(String userId, String userType, Socket socket, BufferedReader in, BufferedWriter out) {
-    this.socket = socket;
-    this.in = in;
-    this.out = out;
+        this.socket = socket;
+        this.in = in;
+        this.out = out;
 
-    String userName = "알수없음";
-    String userDept = "-";
+        String userName = "알수없음";
+        String userDept = "-";
 
-    // ✅ 서버로부터 사용자 이름, 학과 요청
-    try {
-        out.write("INFO_REQUEST:" + userId + "\n");
-        out.flush();
+        try {
+            out.write("INFO_REQUEST:" + userId + "\n");
+            out.flush();
 
-        String response = in.readLine();
-        if (response != null && response.startsWith("INFO_RESPONSE:")) {
-            String[] parts = response.substring("INFO_RESPONSE:".length()).split(",");
-            if (parts.length >= 4) {
-                userName = parts[1].trim();
-                userDept = parts[2].trim();
+            String response = in.readLine();
+            if (response != null && response.startsWith("INFO_RESPONSE:")) {
+                String[] parts = response.substring("INFO_RESPONSE:".length()).split(",");
+                if (parts.length >= 4) {
+                    userName = parts[1].trim();
+                    userDept = parts[2].trim();
+                }
             }
+        } catch (IOException e) {
+            System.out.println(" 사용자 정보 수신 실패: " + e.getMessage());
         }
-    } catch (IOException e) {
-        System.out.println(" 사용자 정보 수신 실패: " + e.getMessage());
+
+        this.model = new UserMainModel(userId, userType, socket, in, out);
+
+        // studentId 넘겨주는 생성자 사용
+        this.view = new UserMainView(userId);
+        view.setWelcomeMessage(userName);
+
+        this.approvalNotificationController = new ApprovalNotificationController(userId, view);
+        this.approvalNotificationController.showPendingNotificationsOnLogin();
+        this.approvalNotificationController.startPolling();
+
+        initializeNotificationSystem();
+        initListeners();
+
+        if (socket != null && out != null) {
+            LogoutUtil.attach(view, userId, socket, out);
+        }
+
+        view.setVisible(true);
     }
-
-    this.model = new UserMainModel(userId, userType, socket, in, out);
-    this.view = new UserMainView();
-    view.setWelcomeMessage(userName); //  서버에서 받은 이름 사용
-
-    initializeNotificationSystem();
-    initListeners();
-
-    if (socket != null && out != null) {
-        LogoutUtil.attach(view, userId, socket, out);
-    }
-
-    view.setVisible(true);
-}
 
     private void initializeNotificationSystem() {
         try {
             notificationController = NotificationController.getInstance(
-    model.getUserId(),
-    model.getUserType(),  //  여기 추가
-    model.getSocket(),
-    model.getIn(),
-    model.getOut()
-);
+                    model.getUserId(),
+                    model.getUserType(),
+                    model.getSocket(),
+                    model.getIn(),
+                    model.getOut()
+            );
             notificationButton = new NotificationButton(
-                model.getUserId(), model.getUserType(),  model.getSocket(), model.getIn(), model.getOut()
+                    model.getUserId(),
+                    model.getUserType(),
+                    model.getSocket(),
+                    model.getIn(),
+                    model.getOut()
             );
             view.setNotificationButton(notificationButton);
         } catch (Exception e) {
             System.err.println("알림 시스템 초기화 실패: " + e.getMessage());
             JOptionPane.showMessageDialog(view, "알림 시스템 초기화에 실패했습니다. 기본 기능은 정상 작동합니다.",
-                                          "경고", JOptionPane.WARNING_MESSAGE);
+                    "경고", JOptionPane.WARNING_MESSAGE);
         }
     }
 
@@ -94,30 +106,32 @@ public class UserMainController {
 
     private void openReservationList() {
         view.dispose();
-        shutdownNotificationSystem();
-        new UserReservationListController(model.getUserId(), model.getUserType(),  model.getSocket(), model.getIn(), model.getOut());
+        shutdownAllNotificationSystems();
+        new UserReservationListController(model.getUserId(), model.getUserType(),
+                model.getSocket(), model.getIn(), model.getOut());
     }
 
     private void openReservationSystem() {
         try {
             view.dispose();
-            shutdownNotificationSystem();
+            shutdownAllNotificationSystems();
             view.showMessage("강의실 예약 시스템으로 연결됩니다", "안내", JOptionPane.INFORMATION_MESSAGE);
             new ReservationGUIController(model.getUserId(), model.getUserName(), model.getUserDept(),
-                                         model.getUserType(), model.getSocket(), model.getIn(), model.getOut());
+                    model.getUserType(), model.getSocket(), model.getIn(), model.getOut());
         } catch (Exception e) {
             JOptionPane.showMessageDialog(view, "예약 시스템 연결 중 오류: " + e.getMessage(),
-                                          "오류", JOptionPane.ERROR_MESSAGE);
+                    "오류", JOptionPane.ERROR_MESSAGE);
         }
     }
 
     private void openNoticeSystem() {
         try {
             view.dispose();
+            shutdownAllNotificationSystems();
             new UserNoticeController(model.getUserId(), model.getSocket(), model.getIn(), model.getOut());
         } catch (Exception e) {
             JOptionPane.showMessageDialog(view, "공지사항 시스템 연결 중 오류: " + e.getMessage(),
-                                          "오류", JOptionPane.ERROR_MESSAGE);
+                    "오류", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -125,20 +139,27 @@ public class UserMainController {
         int result = JOptionPane.showConfirmDialog(view, "로그아웃 하시겠습니까?", "로그아웃", JOptionPane.YES_NO_OPTION);
 
         if (result == JOptionPane.YES_OPTION) {
-            shutdownNotificationSystem(); // 알림 시스템만 정리하고
-
-            view.dispose(); // 현재 화면 닫기
+            shutdownAllNotificationSystems(); // 알림 모두 정리
+            view.dispose();
             login.LoginView loginView = new login.LoginView();
             login.LoginModel loginModel = new login.LoginModel();
             new login.LoginController(loginView, loginModel);
-            loginView.setVisible(true); // 로그인 화면 보여주기
+            loginView.setVisible(true);
         }
     }
 
-    private void shutdownNotificationSystem() {
+    // 알림 시스템 전부 종료 (푸시 알림 포함)
+    private void shutdownAllNotificationSystems() {
         try {
-            if (notificationController != null) notificationController.shutdown();
-            if (notificationButton != null) notificationButton.shutdown();
+            if (notificationController != null) {
+                notificationController.shutdown();
+            }
+            if (notificationButton != null) {
+                notificationButton.shutdown();
+            }
+            if (approvalNotificationController != null) {
+                approvalNotificationController.stop();
+            }
         } catch (Exception e) {
             System.err.println("알림 시스템 종료 오류: " + e.getMessage());
         }
