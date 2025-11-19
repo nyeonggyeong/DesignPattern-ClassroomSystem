@@ -6,14 +6,19 @@ import java.awt.*;
 import java.awt.event.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.List;
 import java.util.*;
 
 public class ReservationView extends JFrame {
-
+    
+    private JComboBox<String> buildingComboBox;
+    private JComboBox<String> floorComboBox;
+    private JComboBox<String> roomComboBox;
+    
     private JLabel nameLabel, idLabel, deptLabel;
     private JComboBox<String> roomTypeComboBox;
     private JLabel roomInfoLabel;
-    private JComboBox<String> roomComboBox;
+    
     private JPanel timeSlotPanel;
     private JDatePickerImpl datePicker;
     private JTextField selectedTimeField;
@@ -43,13 +48,20 @@ public class ReservationView extends JFrame {
 
         JPanel centerPanel = new JPanel();
         centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
-
-        JPanel typePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        typePanel.add(new JLabel("강의실 유형:"));
-        roomTypeComboBox = new JComboBox<>();
-        roomTypeComboBox.setSelectedItem("강의실");
-        typePanel.add(roomTypeComboBox);
-        centerPanel.add(typePanel);
+        
+        // 건물 선택
+        JPanel buildingPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        buildingPanel.add(new JLabel("건물 선택:"));
+        buildingComboBox = new JComboBox();
+        buildingPanel.add(buildingComboBox);
+        centerPanel.add(buildingPanel);
+        
+        // 층 선택
+        JPanel floorPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        floorPanel.add(new JLabel("층 선택:"));
+        floorComboBox = new JComboBox<>();
+        floorPanel.add(floorComboBox);
+        centerPanel.add(floorPanel);
 
         // 강의실 선택
         JPanel roomPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -82,6 +94,7 @@ public class ReservationView extends JFrame {
         JLabel timeLabel = new JLabel("예약 가능한 시간대 목록:", SwingConstants.CENTER);
         timeLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         centerPanel.add(timeLabel);
+        
         timeSlotPanel = new JPanel();
         timeSlotPanel.setLayout(new GridLayout(0, 2));
         JScrollPane scrollPane = new JScrollPane(timeSlotPanel);
@@ -92,6 +105,7 @@ public class ReservationView extends JFrame {
         JPanel timePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         timePanel.add(new JLabel("선택한 시간:"));
         selectedTimeField = new JTextField(30);
+        selectedTimeField.setEditable(false);
         timePanel.add(selectedTimeField);
         centerPanel.add(timePanel);
 
@@ -108,36 +122,36 @@ public class ReservationView extends JFrame {
         centerPanel.add(purposeLabel);
 
         purposePanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        String[] purposes = {"수업", "시험", "스터디", "세미나", "기타"};
-        purposeButtons = new JButton[purposes.length];
-
-        Dimension fixedSize = new Dimension(80, 30);  // 원하는 크기
-        Insets margin = new Insets(5, 10, 5, 10);  //내부 여백 고정
-
-        for (int i = 0; i < purposes.length; i++) {
-            final String purpose = purposes[i];
-            JButton btn = new JButton(purpose);
-            btn.setPreferredSize(fixedSize);           //  고정 크기
-            btn.setMargin(margin);                     //  고정 여백
-            btn.setFocusPainted(false);                //  클릭 테두리 제거
-            btn.setBackground(null);                   // 초기 배경
-
-            purposeButtons[i] = btn;
-
-            btn.addActionListener(e -> {
-                selectedPurpose = purpose;
-
-                for (JButton b : purposeButtons) {
-                    b.setBackground(null);
-                    b.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
-                }
-
-                btn.setBackground(new Color(200, 230, 255)); // 파스텔 블루
-                btn.setBorder(BorderFactory.createLineBorder(Color.BLUE, 2)); // 강조
-            });
-
-            purposePanel.add(purposeButtons[i]);
-        }
+//        String[] purposes = {"수업", "시험", "스터디", "세미나", "기타"};
+//        purposeButtons = new JButton[purposes.length];
+//
+//        Dimension fixedSize = new Dimension(80, 30);  // 원하는 크기
+//        Insets margin = new Insets(5, 10, 5, 10);  //내부 여백 고정
+//
+//        for (int i = 0; i < purposes.length; i++) {
+//            final String purpose = purposes[i];
+//            JButton btn = new JButton(purpose);
+//            btn.setPreferredSize(fixedSize);           //  고정 크기
+//            btn.setMargin(margin);                     //  고정 여백
+//            btn.setFocusPainted(false);                //  클릭 테두리 제거
+//            btn.setBackground(null);                   // 초기 배경
+//
+//            purposeButtons[i] = btn;
+//
+//            btn.addActionListener(e -> {
+//                selectedPurpose = purpose;
+//
+//                for (JButton b : purposeButtons) {
+//                    b.setBackground(null);
+//                    b.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
+//                }
+//
+//                btn.setBackground(new Color(200, 230, 255)); // 파스텔 블루
+//                btn.setBorder(BorderFactory.createLineBorder(Color.BLUE, 2)); // 강조
+//            });
+//
+//            purposePanel.add(purposeButtons[i]);
+//        }
 
         centerPanel.add(purposePanel);
 
@@ -158,39 +172,80 @@ public class ReservationView extends JFrame {
         idLabel.setText("학번: " + id);
         deptLabel.setText("학과: " + dept);
     }
-
-    public void setRoomTypeList(java.util.List<String> types) {
-        roomTypeComboBox.removeAllItems();
-        for (String type : types) {
-            roomTypeComboBox.addItem(type);
+    
+    // 건물 목록 설정
+    public void setBuildingList(List<String> buildings) {
+        buildingComboBox.removeAllItems();
+        for (String building : buildings) {
+            buildingComboBox.addItem(building);
         }
     }
+    
+    // 층 목록 설정
+    public void setFloorList(List<String> floors) {
+        floorComboBox.removeAllItems();
+        for (String floor : floors) {
+            floorComboBox.addItem(floor);
+        }
+    }
+    
+//    
+//    public void setRoomTypeList(List<String> types) {
+//        roomTypeComboBox.removeAllItems();
+//        for (String type : types) {
+//            roomTypeComboBox.addItem(type);
+//        }
+//    }
 
-    // 강의실 콤보박스 채우기
-    /**
-     *
-     * @param roomNames 강의실 이름 리스트
-     */
+    // 강의실 목록 설정
     public void setRoomList(java.util.List<String> roomNames) {
         roomComboBox.removeAllItems();
         for (String name : roomNames) {
             roomComboBox.addItem(name);
         }
     }
-
-    public String getSelectedRoomType() {
-        return (String) roomTypeComboBox.getSelectedItem();
+    
+    public String getSelectedBuilding() {
+        return (String) buildingComboBox.getSelectedItem();
     }
+    
+    public JComboBox<String> getBuildingComboBox() {
+        return buildingComboBox;
+    }
+    
+    public JComboBox<String> getFloorComboBox() {
+        return floorComboBox;
+    }
+
+    public JComboBox<String> getRoomComboBox() { 
+        return roomComboBox;
+    }
+    
+    public String getSelectedFloor() {
+        return (String) floorComboBox.getSelectedItem();
+    }
+    
+//    public String getSelectedRoomType() {
+//        return (String) roomTypeComboBox.getSelectedItem();
+//    }
 
     public String getSelectedRoom() {
         return (String) roomComboBox.getSelectedItem();
     }
-
-    public void addRoomTypeSelectionListener(ActionListener listener) {
-        roomTypeComboBox.addActionListener(listener);
+    
+    public void addBuildingListener(ActionListener listener) {
+        buildingComboBox.addActionListener(listener);
     }
 
-    public void addRoomSelectionListener(ActionListener listener) {
+    public void addFloorListener(ActionListener listener) {
+        floorComboBox.addActionListener(listener);
+    }
+    
+//    public void addRoomTypeSelectionListener(ActionListener listener) {
+//        roomTypeComboBox.addActionListener(listener);
+//    }
+
+    public void addRoomListener(ActionListener listener) {
         roomComboBox.addActionListener(listener);
     }
 
@@ -198,18 +253,26 @@ public class ReservationView extends JFrame {
         return datePicker.getJFormattedTextField().getText().trim();
     }
 
-    public void addDateSelectionListener(ActionListener listener) {
+    public void addDateListener(ActionListener listener) {
         datePicker.addActionListener(listener);
     }
 
-    public void addTimeSlot(String time, ActionListener listener) {
+    public void addTimeSlot(String time, boolean isAvailable, ActionListener listener) {
         JButton timeButton = new JButton(time);
-        timeButton.setBackground(Color.LIGHT_GRAY);
+        
+        if (isAvailable) {
+            timeButton.setBackground(Color.WHITE);
+            timeButton.setEnabled(true);
+        } else {
+            timeButton.setBackground(new Color(255, 200, 200)); 
+            timeButton.setEnabled(false);
+        }
+        
         timeButton.addActionListener(listener);
         timeButton.addActionListener(e -> {
             if (selectedTimes.contains(time)) {
                 selectedTimes.remove(time);
-                timeButton.setBackground(Color.LIGHT_GRAY);
+                timeButton.setBackground(Color.WHITE);
             } else {
                 selectedTimes.add(time);
                 timeButton.setBackground(new Color(180, 220, 250));
@@ -243,10 +306,11 @@ public class ReservationView extends JFrame {
     }
 
     public String getSelectedPurpose() {
+        System.out.println(selectedPurpose);
         return selectedPurpose;
     }
 
-    public void addReserveButtonListener(ActionListener listener) {
+    public void addReserveListener(ActionListener listener) {
         reserveButton.addActionListener(listener);
     }
 

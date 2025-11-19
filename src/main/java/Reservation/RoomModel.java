@@ -15,30 +15,16 @@ public class RoomModel {
     private String floor; // 층
     private String roomNumber; // 호수
     private String fullName;
+    private int capacity;
 
-    /*
-    public Room() {
-        this.name = "강의실";
-        this.type
-        this()
-    }
-     */
-//    public RoomModel(String name, String type, String[] availableTimes) {
-//        this.name = name;
-//        this.type = type;
-//        this.availableTimes = availableTimes;
-//    }
-//    
-    public RoomModel(String roomNumber, String type, String[] timeSlots) {
-        this("정보관", "9", roomNumber, type);
-    }
     
-    public RoomModel(String building, String floor, String roomNumber, String type) {
+    public RoomModel(String building, String floor, String roomNumber, String type, int capacity) {
         this.building = building;
         this.floor = floor;
         this.roomNumber = roomNumber;
         this.type = type;
         this.fullName = String.format("%s-%s층-%s호", building, floor, roomNumber);
+        this.capacity = capacity;
     }
     
     public String getBuilding() { return building; }
@@ -48,6 +34,8 @@ public class RoomModel {
     public String getRoomNumber() { return roomNumber; }
     
     public String getFullName() {return fullName; }
+    
+    public int getCapacity() { return capacity; }
     
     public String getName() {
         return roomNumber;

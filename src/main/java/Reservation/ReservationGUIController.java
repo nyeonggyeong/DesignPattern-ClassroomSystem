@@ -2,6 +2,7 @@ package Reservation;
 
 import ServerClient.LogoutUtil;
 import UserFunction.UserMainController;
+import com.google.gson.Gson;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
@@ -10,6 +11,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.awt.event.*;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -22,34 +24,31 @@ import java.text.SimpleDateFormat;
 public class ReservationGUIController {
 
     private ReservationView view; // 사용자 인터페이스 뷰 (GUI)
-    private static final String EXCEL_PATH = "src/main/resources/available_rooms.xlsx";
-    private static final List<String> LAB_ROOMS = Arrays.asList("911", "915", "916", "918");
+    private static final String ROOMS_JSON_PATH = "src/main/resources/rooms.json";
+    private static final String SCHEDULES_JSON_PATH = "src/main/resources/schedules.json";
     private final String reservationPath = "src/main/resources/reservation.txt";
 
     private List<RoomModel> allRooms = new ArrayList<>(); //로드된 강의실 목록
-    public Workbook workbook; // 엑셀 파일 워크북 객체
+    private ScheduleRoot scheduleData; // 요일별 목록
+    private List<String[]> copyReserved = new ArrayList<>(); // 기존 학생 예약 목록
+    private Set<String> cancelReservationUser = new HashSet<>(); // 취소될 사용자 정보
 
     private String userName;  //사용자 이름
     private String userId;  //사용자id
     private String userDept;    //사용자 학과
     private String userType; // "학생" 또는 "교수"
-
     private Socket socket;
-    private BufferedReader in; //
-
+    private BufferedReader in;
     private BufferedWriter out;
-    private List<String[]> copyReserved; // 기존 예약 내용 저장
+
     private String reserveDate; // 예약 시간
     private List<String> reserveTimes; // 예약 시간(시작, 끝)
-    private String reserveTime;
     private String reservePurpose; // 예약 목적
-    private String reserveRoomName; // 예약 룸 이름(강의실 or 실습실)
+//    private String reserveRoomName; // 예약 룸 이름(강의실 or 실습실)
     private RoomModel selectedRoom;
     private String dayOfWeek;
-    private String startTime;
-    private String endTime;
     private String status;
-    private Set<String> cancelReservationUser;
+    private String reserveRoomNumber;
 
 //클라이언트-서버 연결 코드(로그인과 사용자 페이지 연결되면 주석 해제)
     public ReservationGUIController(String userId, String name, String dept, String type,
@@ -62,6 +61,7 @@ public class ReservationGUIController {
         this.in = in;
         this.out = out;
         System.out.println("사용자ID:" + this.userId + "사용자 이름: " + userName + "사용자Dept: " + userDept);
+
         view = new ReservationView();
 
         // 서버에서 사용자 정보 불러오기
@@ -73,42 +73,53 @@ public class ReservationGUIController {
 
         LogoutUtil.attach(view, userId, socket, out);
 
+        // json 데이터 불러오기
+        loadRoomsJson();
+        loadSchedulesJson();
+
         initializeReservationFeatures();
 
         view.setVisible(true);
-        copyReserved = new ArrayList<>();
-        cancelReservationUser = new HashSet<>();
     }
 
-    /**
-     * [기본 생성자] - 테스트용 서버 연결 없이 테스트 또는 임시 실행
-     */
-//    public ReservationGUIController() {
-//
-//        view = new ReservationView();
-//        view.setUserInfo(userName, userId, userDept);
-//
-//        // userName이나 userDept가 비어 있으면 서버에 사용자 정보 요청
-//        if ((userName == null || userName.isEmpty()) || (userDept == null || userDept.isEmpty())) {
-//            try { // 추가
-//                out.write("INFO_REQUEST:" + userId + "\n");
-//                out.flush(); // 추가
-//                String response = new BufferedReader(new InputStreamReader(socket.getInputStream())).readLine();
-//                if (response != null && response.startsWith("INFO_RESPONSE:")) { // 추가
-//                    String[] parts = response.substring("INFO_RESPONSE:".length()).split(",");
-//                    if (parts.length >= 3) {
-//                        this.userName = parts[1];
-//                        this.userDept = parts[2];
-//                        view.setUserInfo(this.userName, userId, this.userDept); // 추가
-//                    } // 추가
-//                } // 추가
-//            } catch (IOException e) { // 추가
-//                System.out.println(" 사용자 정보 요청 오류: " + e.getMessage()); // 추가
-//            } // 추가
-//        } // 추가
-//        initializeReservationFeatures();
-//        view.setVisible(true);
-//    }
+    private void loadRoomsJson() {
+        allRooms.clear();
+        Gson gson = new Gson();
+        try (Reader reader = Files.newBufferedReader(Paths.get(ROOMS_JSON_PATH), StandardCharsets.UTF_8)) {
+            RoomStaticRoot root = gson.fromJson(reader, RoomStaticRoot.class);
+
+            if (root != null && root.buildings != null) {
+                for (BuildingStatic b : root.buildings) {
+                    for (FloorStatic f : b.floors) {
+                        for (RoomStatic r : f.rooms) {
+                            RoomModel model = new RoomModel(
+                                    b.name,
+                                    String.valueOf(f.floor),
+                                    r.roomNumber,
+                                    r.type,
+                                    r.capacity
+                            );
+                            allRooms.add(model);
+                        }
+                    }
+                }
+            }
+            System.out.println("room.json 로드 완료");
+        } catch (IOException e) {
+            System.out.println("에러 발생: " + e.getMessage());
+        }
+    }
+
+    private void loadSchedulesJson() {
+        Gson gson = new Gson();
+        try (Reader reader = Files.newBufferedReader(Paths.get(SCHEDULES_JSON_PATH), StandardCharsets.UTF_8)) {
+            scheduleData = gson.fromJson(reader, ScheduleRoot.class);
+            System.out.println("schedules.json 로드 완료");
+        } catch (IOException e) {
+            System.out.println("에러 발생" + e.getMessage());
+            scheduleData = new ScheduleRoot();
+        }
+    }
 
     /**
      * 예약 기능 초기화: - 강의실 목록, 버튼 이벤트, 시간대 표시, UI 구성 등
@@ -122,393 +133,331 @@ public class ReservationGUIController {
             view.setPurposeOptions(List.of("스터디", "동아리 활동", "면담", "팀 회의"));  // 학생용
         }
 
-        loadRoomsFromExcel();
-        // 강의실 유형 선택시 → 해당 방 목록 표시
-        view.setRoomTypeList(Arrays.asList("강의실", "실습실"));
-
-        view.addRoomTypeSelectionListener(e -> {
-            String selectedType = view.getSelectedRoomType();
-            List<String> filtered = allRooms.stream()
-                    .filter(r -> r.getType().equals(selectedType))
-                    .map(RoomModel::getName)
-                    .collect(Collectors.toList());
-            view.setRoomList(filtered);
+        // 건물 세팅
+        List<String> buildings = allRooms.stream()
+                .map(RoomModel::getBuilding)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+        view.setBuildingList(buildings);
+        // 층 설정
+        view.addBuildingListener(e -> updateFloorList());
+        // 강의실 설정
+        view.addFloorListener(e -> updateRoomList());
+        // 강의실 정보, 시간표 설정
+        view.addRoomListener(e -> {
+            updateRoomInfo();
+            updateAvailableTimes();
         });
+        // 날짜 변경시 시간표 갱신
+        view.addDateListener(e -> updateAvailableTimes());
+        // 초기 세팅
+        if (!buildings.isEmpty()) {
+            view.getBuildingComboBox().setSelectedIndex(0);
+        }
 
-        // 날짜 or 강의실 선택 변경 시 시간대 갱신
-        ActionListener timeUpdateListener = e -> {
-            updateAvailableTimes();  // 예약 가능한 시간대 갱신
-            String selectedRoom = view.getSelectedRoom();
-            if (selectedRoom != null && !selectedRoom.isEmpty()) {
-                String roomInfo = getRoomInfo(selectedRoom);  // 강의실 정보 가져오기
-                view.setRoomInfoText(roomInfo);               // View에 표시
-            }
-        };
-        view.addRoomSelectionListener(timeUpdateListener);
-        view.addDateSelectionListener(timeUpdateListener);
-
-        view.addReserveButtonListener(e -> {
-            reserveDate = view.getSelectedDate();
-            reserveTimes = view.getSelectedTimes();
-            reserveTime = view.getSelectedTime();
-            reservePurpose = view.getSelectedPurpose();
-            reserveRoomName = view.getSelectedRoom();
-            selectedRoom = getRoomByName(reserveRoomName);
-
-            if (reserveDate.isEmpty() || reserveTime.isEmpty() || reservePurpose.isEmpty() || selectedRoom == null) {
-                view.showMessage("모든 항목을 입력해주세요.");
-                return;
-            }
-
-            // 예약 제한 사용자 체크 추가 부분
-            ReservationController controller = new ReservationController();
-            if (controller.isUserBanned(userId)) {
-                view.showMessage("해당 사용자는 예약이 제한되어 있습니다. 관리자에게 문의하세요.");
-                return;
-            }
-
-            // 해당 강의실 수용인원 체크
-            if (checkRoom(reserveDate, reserveTimes, reserveRoomName)) {
-                System.out.println("예약 진행");
-            } else {
-                System.out.println("예약 실패");
-                view.showMessage(reserveRoomName + "의 수용인원이 가득차 예약이 불가합니다.");
-                return;
-            }
-            
-            if (userType.equals("교수")) {
-                copyReserved = isTimeSlotAlreadyReserved(reserveRoomName, reserveDate, reserveTimes);
-
-                if (!copyReserved.isEmpty()) {
-                     boolean professorReserved = copyReserved.stream()
-                            .anyMatch(parts -> parts[1].equals("교수") && !"기타".equals(parts[10]));
-                    // 기존 예약이 있는 경우
-                    if (professorReserved) {
-                        view.showMessage("선택한 시간대에 다른 교수님의 예약이 존재합니다.");
-                        return;
-                    }
-
-                    // 학생 예약이거나 교수의 "기타" 예약 -> 덮어쓰기
-                    if (professorReservation()) {
-                        view.showMessage("예약이 확정되었습니다.");
-                        return;  
-                    } else {
-                        view.showMessage("예약 실패");
-                        return;
-                    }
-                }
-                status = "예약확정";
-                view.showMessage("예약이 확정되었습니다.");
-            } else {
-                copyReserved = isTimeSlotAlreadyReserved(reserveRoomName, reserveDate, reserveTimes);
-                if (!copyReserved.isEmpty()) {
-                    view.showMessage("선택한 시간대에 이미 예약이 존재합니다.");
-                    return;
-                }
-
-                if (isUserAlreadyReserved(userId, reserveDate)) {
-                    view.showMessage("학생은 하루 1회만 예약할 수 있습니다.");
-                    return;
-                }
-
-                int totalMinutes = calculateTotalDuration(reserveTimes);
-                if (totalMinutes > 120) {
-                    view.showMessage("총 예약 시간이 2시간(120분)을 초과할 수 없습니다.");
-                    return;
-                }
-
-                status = "예약대기";
-                view.showMessage("예약이 등록되었습니다. 관리자의 승인을 기다리는 중입니다.");
-            }
-
-            dayOfWeek = getDayOfWeek(reserveDate);
-
-            for (String selectedTime : reserveTimes) {
-                String[] split = selectedTime.split("~");
-                if (split.length == 2) {
-                    startTime = split[0].trim();
-                    endTime = split[1].trim();
-
-                    saveReservation(userName, userType, userId, userDept,
-                            selectedRoom.getType(), selectedRoom.getName(),
-                            reserveDate, dayOfWeek, startTime, endTime, reservePurpose, status);
-                }
-            }
-        });
-
+        view.addReserveListener(e -> handleReservation());
         view.addBackButtonListener(e -> {
             view.dispose();  // 현재 ReservationView 닫기
 
             // UserMainController 생성 (기존 로그인 정보 전달)
             new UserMainController(userId, userType, socket, in, out);
         });
-        view.setVisible(true);
-    }
-    //reserveDate, reserveTimes, reserveRoomName
-    public boolean checkRoom(String date, List<String> times, String room) {
-        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
-        
-        for (String time : times) {
-            String[] partTime = time.split("~");
-            String newStartTime = partTime[0].trim();
-            String newEndTime = partTime[1].trim();
-            
-            int count = 0;
-            try (BufferedReader reader = new BufferedReader(new FileReader(reservationPath))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    String[] parts = line.split(",");
-                    if (parts.length < 10) continue;
-                    
-                    String reservedRoom = parts[5];
-                    String reservedDate = parts[6];
-                    String reservedStart = parts[8];
-                    String reservedEnd = parts[9];
-                    
-                    if (!reservedRoom.equals(room) || !reservedDate.equals(date)) {
-                        continue;
-                    }
-                    
-                    try {
-                        Date newStart = sdf.parse(newStartTime);
-                        Date newEnd = sdf.parse(newEndTime);
-                        Date pastStart = sdf.parse(reservedStart);
-                        Date pastEnd = sdf.parse(reservedEnd);
-                        
-                        if (newStart.before(pastEnd) && newEnd.after(pastStart)) {
-                            count += 1;
-                        }
-                    } catch (Exception e) {
-                        System.out.println("에러 발생:" + e.getMessage());
-                    }
-                    // 강의실당 수용인원 30명, 50%는 15명으로 설정
-                    // 예약되어있는 강의실 사용자 수가 14 이상이면 해당 사용자 까지 예약하고 15명을 맞춤
-                    if (count >= 15) {
-                        return false;
-                    }
-                        
-                }
-            } catch (Exception e) {
-                System.out.println("에러발생: " + e.getMessage());
-            }
-        } 
-        return true;
-    }
-    
-    /**
-     * classroom.txt에서 강의실 정보 가져오기 (위치, 인원, 비고)
-     */
-    public String getRoomInfo(String roomName) {
-        String filePath = "src/main/resources/classroom.txt";
-        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String[] parts = line.split(",", -1);
-                if (parts.length == 4 && parts[0].equals(roomName)) {
-                    return String.format("%s, %s, %s", parts[1], parts[2], parts[3]); // 위치, 인원, 비고
-                }
-            }
-        } catch (IOException e) {
-            System.out.println("강의실 정보 읽기 실패: " + e.getMessage());
-        }
-        return "정보 없음";
+
     }
 
-    /**
-     * 날짜/강의실 선택 시 → 선택 가능한 시간대 갱신
-     */
-    private void updateAvailableTimes() {
-        String date = view.getSelectedDate();
-        String roomName = view.getSelectedRoom();
-        if (date == null || date.isEmpty() || roomName == null) {
+    // 층 데이터 세팅
+    private void updateFloorList() {
+        String selectedBuilding = view.getSelectedBuilding();
+        if (selectedBuilding == null) {
             return;
         }
 
-        int dayCol = getDayColumnIndex(date);
+        List<String> floors = allRooms.stream()
+                .filter(r -> r.getBuilding().equals(selectedBuilding))
+                .map(RoomModel::getFloor)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
 
-        Sheet sheet = workbook.getSheet(roomName);
-        List<String> availableTimes = getAvailableTimesByDay(sheet, dayCol);
+        view.setFloorList(floors);
+        updateRoomList();
+    }
 
+    private void updateRoomList() {
+        String selectedBuilding = view.getSelectedBuilding();
+        String selectedFloor = view.getSelectedFloor();
+
+        if (selectedBuilding == null || selectedFloor == null) {
+            return;
+        }
+
+        List<String> rooms = allRooms.stream()
+                .filter(r -> r.getBuilding().equals(selectedBuilding))
+                .filter(r -> r.getFloor().equals(selectedFloor))
+                .map(RoomModel::getRoomNumber)
+                .sorted()
+                .collect(Collectors.toList());
+
+        view.setRoomList(rooms);
+
+        if (!rooms.isEmpty()) {
+            view.getRoomComboBox().setSelectedIndex(0);
+            updateRoomInfo();
+            updateAvailableTimes();
+        }
+        // 방 정보 즉시 갱신
+    }
+
+    private void updateRoomInfo() {
+        RoomModel room = getCurrentSelectedRoomModel();
+        if (room != null) {
+            view.setRoomInfoText(String.format("[%s] %s (수용인원: %d명)",
+                    room.getType(), room.getFullName(), room.getCapacity()));
+        } else {
+            view.setRoomInfoText("");
+        }
+    }
+
+    private RoomModel getCurrentSelectedRoomModel() {
+        String building = view.getSelectedBuilding();
+        String floor = view.getSelectedFloor();
+        String room = view.getSelectedRoom();
+
+        if (building == null || floor == null || room == null) {
+            return null;
+        }
+
+        return allRooms.stream()
+                .filter(m -> m.getBuilding().equals(building) && m.getFloor().equals(floor) && m.getRoomNumber().equals(room))
+                .findFirst()
+                .orElse(null);
+
+    }
+
+    private void updateAvailableTimes() {
         view.clearTimeSlots();
-        for (String time : availableTimes) {
-            view.addTimeSlot(time, e -> {
+
+        String date = view.getSelectedDate();
+        RoomModel room = getCurrentSelectedRoomModel();
+
+        if (date == null || date.isEmpty() || room == null) {
+            return;
+        }
+
+        String dayOfWeek = getDayOfWeek(date);
+        String[] defaultTimes = {
+            "09:00~09:50", "10:00~10:50", "11:00~11:50", "12:00~12:50",
+            "13:00~13:50", "14:00~14:50", "15:00~15:50", "16:00~16:50",
+            "17:00~17:50", "18:00~18:50"
+        };
+
+        Map<String, String> scheduleMap = getScheduleForRoom(room, dayOfWeek);
+
+        for (String time : defaultTimes) {
+            boolean isAvailable = true;
+            if (scheduleMap.containsKey(time)) {
+                String status = scheduleMap.get(time);
+                if (!"비어있음".equals(status)) {
+                    isAvailable = false;
+                }
+            }
+
+            if (isAvailable && isReservedInFile(room, date, time)) {
+                isAvailable = false;
+            }
+
+            view.addTimeSlot(time, isAvailable, e -> {
                 int total = calculateTotalDuration(view.getSelectedTimes());
                 view.setTotalDuration(total + "분");
             });
         }
     }
 
-    /**
-     * 선택한 시간대들의 총 예약 시간 계산 (분 단위)
-     */
-    public int calculateTotalDuration(List<String> times) {
-        int total = 0;
-        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
-        for (String time : times) {
-            try {
-                String[] parts = time.split("~");
-                Date start = sdf.parse(parts[0]);
-                Date end = sdf.parse(parts[1]);
-                long diff = (end.getTime() - start.getTime()) / (1000 * 60);
-                total += diff;
-            } catch (ParseException e) {
-                System.out.println("시간 파싱 오류: " + time);
-            }
+    private Map<String, String> getScheduleForRoom(RoomModel targetRoom, String day) {
+        Map<String, String> result = new HashMap<>();
+        if (day.isEmpty() || scheduleData == null || scheduleData.schedules == null) {
+            return result;
         }
-        return total;
+
+        scheduleData.schedules.stream()
+                .filter(s -> s.buildings.equals(targetRoom.getBuilding()))
+                .flatMap(s -> s.floors.stream())
+                .filter(f -> f.floor.equals(targetRoom.getFloor()))
+                .flatMap(f -> f.roomNumbers.stream())
+                .filter(r -> r.roomNumber.equals(targetRoom.getRoomNumber()))
+                .flatMap(r -> r.timeSlots.stream())
+                .forEach(ts -> {
+                    if (ts.availability != null && ts.availability.containsKey(day)) {
+                        result.put(ts.time, ts.availability.get(day));
+                    }
+                });
+        return result;
     }
 
-    /**
-     * 사용자가 이미 예약했는지 확인 (하루 1회 제한) - 학생만
-     */
-    public boolean isUserAlreadyReserved(String userId, String date) {
-        String path = "src/main/resources/reservation.txt";
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(new FileInputStream(path), "UTF-8"))) {
+    private boolean isReservedInFile(RoomModel room, String date, String newTimeSlot) {
+        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(reservationPath), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split(",");
-                if (parts.length >= 4) {
-                    if (parts[2].equals(userId) && parts[6].equals(date)) {
-                        return true;
+                // CSV 필드: 이름,유형,ID,학과,건물,방유형,방번호,날짜,요일,시작시간,끝시간,목적,상태 (총 13개)
+                // 기존 코드는 필드 수가 달랐으므로, 현재 13개 기준으로 인덱스 조정 필요:
+                // parts[4]: 건물, parts[6]: 방번호, parts[7]: 날짜, parts[9]: 시작시간, parts[10]: 끝시간
+                if (parts.length >= 13) {
+                    if (parts[4].equals(room.getBuilding()) && parts[6].equals(room.getRoomNumber()) && parts[7].equals(date)) {
+                        Date reservedStart = sdf.parse(parts[9]);
+                        Date reservedEnd = sdf.parse(parts[10]);
+
+                        String[] newRange = newTimeSlot.split("~");
+                        Date newStart = sdf.parse(newRange[0].trim());
+                        Date newEnd = sdf.parse(newRange[1].trim());
+
+                        if (newStart.before(reservedEnd) && newEnd.after(reservedStart)) {
+                            // 예약확정 상태만 충돌로 간주
+                            if (parts[12].equals("예약확정")) {
+                                return true;
+                            }
+                        }
                     }
                 }
             }
-        } catch (IOException e) {
-            System.out.println("예약 기록 읽기 실패: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("파일 예약 충돌 확인 오류: " + e.getMessage());
         }
         return false;
     }
 
-    /*
-    교수 예약을 기존 예약시간에 등록하고, 학생에게 연락
-    염승욱,학생,duatmddnr,컴소,강의실,912,2025-11-15,토,18:00,18:45,스터디,승인
-    
-    1. 기존 예약내역 교수로 뒤덮기
-    2.학생 이름, 학번으로 기존 예약이 취소되었다는 알림 주기
-     */
-    public void removeReservation() {
-        if (copyReserved == null || copyReserved.isEmpty()) {
+    private void handleReservation() {
+        RoomModel room = getCurrentSelectedRoomModel();
+        String date = view.getSelectedDate();
+        List<String> times = view.getSelectedTimes();
+        String purpose = view.getSelectedPurpose();
+        int max_user = 15;
+
+        if (room == null || date.isEmpty() || times.isEmpty() || purpose.isEmpty()) {
+            view.showMessage("모든 정보를 입력해주세요");
             return;
         }
-        
-        Set<String> lines = new HashSet<>();
-        for (String[] reservation : copyReserved) {
-            lines.add(String.join(",",reservation));
-            System.out.println("현재 예약된 내역: " + lines);
-        }
-        
 
-        Path tempPath = null;
-        try {
-            tempPath = Files.createTempFile("tempReservations", ".txt");
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(reservationPath), "UTF-8")); BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(tempPath.toFile()), "UTF-8"))) {
+        this.selectedRoom = room;
+        this.reserveDate = date;
+        this.reserveTimes = times;
+        this.reservePurpose = purpose;
+        this.reserveRoomNumber = room.getRoomNumber();
 
-                String currentLine;
-                while ((currentLine = reader.readLine()) != null) {
-                    if (!lines.contains(currentLine)) {
-                        writer.write(currentLine);
-                        writer.newLine();
-                    }
-                }
-            }
-            Path targetPath = Paths.get(reservationPath);
-            Files.move(tempPath, targetPath, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException ex) {
-
-            System.getLogger(ReservationGUIController.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
-            if (tempPath != null) {
-                try {
-                    Files.deleteIfExists(tempPath);
-                } catch (Exception e) {
-                    System.out.println("임시 파일 삭제 실패: " + e.getMessage());
-                }
-            }
-
-        }
-    }
-    //테스트,교수,dhkdrjs,소프트웨어,강의실,912,2025-11-17,월,13:00,13:50,세미나,예약확정
-    public void setCancelReservationUser() {
-        if (copyReserved == null || copyReserved.isEmpty()) {
+        if (new ReservationController().isUserBanned(userId)) {
+            view.showMessage("해당 사용자는 예약이 제한되어 있습니다. 관리자에게 문의하세요.");
             return;
         }
-        for (String[] user : copyReserved) {
-            String name = user[0];
-            String id = user[2];
-            String room = user[4];
-            String startTime = user[8];
-            String endTime = user[9];
-            
-            String result = String.format("%s,%s,%s,%s-%s",name,id,room,startTime,endTime);
-            cancelReservationUser.add(result);
-        }
-        
-    }
-    
-    public boolean professorReservation() {
-        
-        removeReservation();
-        setCancelReservationUser();
-        status = "예약확정";
 
+        if ("교수".equals(userType)) {
+            if ("기타".equals(reservePurpose)) {
+                copyReserved = isTimeSlotAlreadyReserved(
+                        selectedRoom.getBuilding(),
+                        reserveRoomNumber,
+                        reserveDate,
+                        reserveTimes);
+                if (!copyReserved.isEmpty() && copyReserved.size() >= max_user) {
+                    view.showMessage("선택한 시간대에 이미 예약 인원수가 가득 찼습니다.");
+                    return;
+                }
+                status = "예약확정";
+                saveNewReservation();
+                view.showMessage("예약이 확정되었습니다.");
+            } else if ("세미나".equals(reservePurpose)) {
+                //TODO 동반 학생 설정
+                
+            } else {
+                professorReservation();
+            }
+        } else {
+            copyReserved = isTimeSlotAlreadyReserved(selectedRoom.getBuilding(), reserveRoomNumber, reserveDate, reserveTimes);
+            if (!copyReserved.isEmpty()) {
+                boolean professorReservedByClass = copyReserved.stream()
+                        .anyMatch(parts -> parts[1].equals("교수") && !"기타".equals(parts[12]));
+                if (professorReservedByClass) {
+                    view.showMessage("선택한 시간대에 다른 교수님의 수업 예약이 존재합니다.");
+                    return;
+                }
+
+                if (copyReserved.size() >= max_user) {
+                    view.showMessage("선택한 시간대에 이미 예약 인원수가 가득 찼습니다.");
+                    return;
+                }
+
+            }
+
+            // 학생 시간 제한 체크
+            int totalMinutes = calculateTotalDuration(reserveTimes);
+            if (totalMinutes > 120) {
+                view.showMessage("총 예약 시간이 2시간(120분)을 초과할 수 없습니다.");
+                return;
+            }
+
+            // 학생 하루 1회 제한 체크
+            if (isUserAlreadyReserved(userId, reserveDate)) {
+                view.showMessage("학생은 하루 1회만 예약할 수 있습니다.");
+                return;
+            }
+
+            status = "예약대기";
+            saveNewReservation();
+            view.showMessage("예약이 등록되었습니다. 관리자의 승인을 기다리는 중입니다.");
+        }
+    }
+
+    private void saveNewReservation() {
         dayOfWeek = getDayOfWeek(reserveDate);
-        boolean success = false;
-        
-        for (String selectedTime : reserveTimes) {
-            String[] split = selectedTime.split("~");
+        for (String time : reserveTimes) {
+            String[] split = time.split("~");
             if (split.length == 2) {
-                startTime = split[0].trim();
-                endTime = split[1].trim();
+                String start = split[0].trim();
+                String end = split[1].trim();
 
-                saveReservation(this.userName, userType, this.userId, userDept,
-                        selectedRoom.getType(), selectedRoom.getName(),
-                        reserveDate, dayOfWeek, startTime, endTime, reservePurpose, status);
-                success = true;
+                // [수정] saveReservation의 인자 순서 변경 및 건물 정보 추가 반영 (총 13개 필드)
+                saveReservation(userName, userType, userId, userDept,
+                        selectedRoom.getBuilding(), selectedRoom.getType(), selectedRoom.getRoomNumber(),
+                        reserveDate, dayOfWeek, start, end, reservePurpose, status);
             }
         }
-        if (success && !cancelReservationUser.isEmpty()) {
-            //서버 전송
+        updateAvailableTimes(); // UI 갱신
+    }
+
+    public void professorReservation() {
+        // 기존 예약 내역 확인 
+        copyReserved = isTimeSlotAlreadyReserved(selectedRoom.getBuilding(), reserveRoomNumber, reserveDate, reserveTimes);
+
+        removeReservation(); // 파일에서 기존 예약 삭제
+        setCancelReservationUser(); // 서버로 보낼 취소 알림 사용자 정보 생성
+
+        status = "예약확정";
+        saveNewReservation();
+
+        view.showMessage("교수 예약이 확정되었습니다. 기존 예약자에게는 알림이 전송됩니다.");
+
+        // 서버로 취소 알림 전송
+        if (!cancelReservationUser.isEmpty()) {
             sendCancelReservationUser();
         }
-        return success;
     }
-    
-    public void sendCancelReservationUser() {
-        StringBuilder sb = new StringBuilder("CANCEL_RESERVATION:");
-        
-        for (String user : cancelReservationUser) {
-            if (sb.length() > "CANCEL_RESERVATION:".length()) {
-                sb.append(";");
-            }
-            sb.append(user);
-        }
-        
-        try {
-            out.write(sb.toString());
-            out.newLine();
-            out.flush();
-        } catch (IOException ex) {
-            System.getLogger(ReservationGUIController.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
-        }
-    }
-    
-    /**
-     * 선택한 시간대에 중복 예약이 있는지 확인
-     */
-    public List<String[]> isTimeSlotAlreadyReserved(String roomName, String date, List<String> newTimes) {
+
+    public List<String[]> isTimeSlotAlreadyReserved(String building, String roomNumber, String date, List<String> newTimes) {
         SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
         List<String[]> conflict = new ArrayList<>();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(reservationPath), "UTF-8"))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(reservationPath), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split(",");
-                if (parts.length >= 10) {
-                    String reservedRoom = parts[5];
-                    String reservedDate = parts[6];
-                    String reservedStart = parts[8];
-                    String reservedEnd = parts[9];
+                // parts[4]: 건물, parts[6]: 방번호, parts[7]: 날짜, parts[9]: 시작시간, parts[10]: 끝시간
+                if (parts.length >= 13) {
+                    String reservedBuilding = parts[4];
+                    String reservedRoom = parts[6];
+                    String reservedDate = parts[7];
+                    String reservedStart = parts[9];
+                    String reservedEnd = parts[10];
 
-                    if (reservedRoom.equals(roomName) && reservedDate.equals(date)) {
+                    if (reservedBuilding.equals(building) && reservedRoom.equals(roomNumber) && reservedDate.equals(date)) {
                         Date reservedStartTime = sdf.parse(reservedStart);
                         Date reservedEndTime = sdf.parse(reservedEnd);
 
@@ -528,125 +477,138 @@ public class ReservationGUIController {
                     }
                 }
             }
-        } catch (IOException | ParseException e) {
+        } catch (Exception e) {
             System.out.println("중복 시간 검사 오류: " + e.getMessage());
         }
 
         return conflict;
     }
 
-    /**
-     * 강의실 이름으로 RoomModel 객체 반환
-     */
-    private RoomModel getRoomByName(String name) {
-        for (RoomModel r : allRooms) {
-            if (r.getName().equals(name)) {
-                return r;
-            }
+    public void removeReservation() {
+        if (copyReserved.isEmpty()) {
+            return;
         }
-        return null;
-    }
 
-    /**
-     * Excel 파일에서 강의실 목록 로드 (available_rooms.xlsx)
-     */
-    public void loadRoomsFromExcel() {
-        try (InputStream fis = new FileInputStream(EXCEL_PATH)) {
-            workbook = new XSSFWorkbook(fis);
-            for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
-                Sheet sheet = workbook.getSheetAt(i);
-                String roomName = sheet.getSheetName();
-                RoomModel room = new RoomModel(roomName,
-                        LAB_ROOMS.contains(roomName) ? "실습실" : "강의실",
-                        new String[0]);
-                allRooms.add(room);
-            }
-        } catch (IOException e) {
-            System.out.println("엑셀 파일 읽기 오류: " + e.getMessage());
-        }
-    }
+        // lines에는 삭제할 예약 레코드 전체 문자열이 포함되어야 함
+        Set<String> linesToRemove = copyReserved.stream()
+                .map(parts -> String.join(",", parts))
+                .collect(Collectors.toSet());
 
-    /**
-     * 날짜 → 요일 열 인덱스 변환 (1~7)
-     */
-    public int getDayColumnIndex(String selectedDate) {
+        Path tempPath = null;
         try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-            Date date = sdf.parse(selectedDate);
-            Calendar calendar = Calendar.getInstance();
-            calendar.setTime(date);
-            int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
-            return switch (dayOfWeek) {
-                case Calendar.MONDAY ->
-                    1;
-                case Calendar.TUESDAY ->
-                    2;
-                case Calendar.WEDNESDAY ->
-                    3;
-                case Calendar.THURSDAY ->
-                    4;
-                case Calendar.FRIDAY ->
-                    5;
-                case Calendar.SATURDAY ->
-                    6;
-                case Calendar.SUNDAY ->
-                    7;
+            tempPath = Files.createTempFile("tempReservations", ".txt");
+            Path targetPath = Paths.get(reservationPath);
 
-                default ->
-                    -1;
-            };
-        } catch (Exception e) {
-            return -1;
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(targetPath.toFile()), StandardCharsets.UTF_8)); BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(tempPath.toFile()), StandardCharsets.UTF_8))) {
+
+                String currentLine;
+                while ((currentLine = reader.readLine()) != null) {
+                    if (!linesToRemove.contains(currentLine.trim())) {
+                        writer.write(currentLine);
+                        writer.newLine();
+                    }
+                }
+            }
+            Files.move(tempPath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException ex) {
+            System.out.println("예약 삭제 및 파일 재작성 실패: " + ex.getMessage());
+            if (tempPath != null) {
+                try {
+                    Files.deleteIfExists(tempPath);
+                } catch (Exception e) {
+                    /* ignore */ }
+            }
         }
     }
 
-    /**
-     * Excel 시트에서 선택한 요일의 '비어있음' 시간대 반환
-     */
-    public List<String> getAvailableTimesByDay(Sheet sheet, int dayCol) {
-        List<String> times = new ArrayList<>();
-        for (int rowIdx = 1; rowIdx <= sheet.getLastRowNum(); rowIdx++) {
-            Row row = sheet.getRow(rowIdx);
-            if (row == null) {
-                continue;
-            }
-
-            Cell timeCell = row.getCell(0);
-            if (timeCell == null || timeCell.getCellType() != CellType.STRING) {
-                continue;
-            }
-
-            String time = timeCell.getStringCellValue();
-            Cell cell = row.getCell(dayCol);
-            if (cell != null && "비어있음".equals(cell.getStringCellValue().trim())) {
-                times.add(time);
-            }
+    public void setCancelReservationUser() {
+        if (copyReserved.isEmpty()) {
+            return;
         }
-        return times;
+        cancelReservationUser.clear();
+        for (String[] user : copyReserved) {
+            String name = user[0];
+            String id = user[2];
+            String roomFullName = user[4] + " " + user[6]; // 건물 + 방번호
+            String date = user[7];
+            String startTime = user[9];
+            String endTime = user[10];
+
+            // 서버 전송 형식: 이름,ID,건물호수,날짜_시간
+            String result = String.format("%s,%s,%s,%s %s~%s", name, id, roomFullName, date, startTime, endTime);
+            cancelReservationUser.add(result);
+        }
     }
 
-    /**
-     * 예약 정보를 파일에 저장 (reservation.txt)
-     */
-    private void saveReservation(String name, String userType, String userId, String department,
-            String roomType, String roomNumber,
-            String date, String dayOfWeek, String startTime, String endTime,
-            String purpose, String status) {
+    public void sendCancelReservationUser() {
+        StringBuilder sb = new StringBuilder("CANCEL_RESERVATION:");
+        for (String user : cancelReservationUser) {
+            if (sb.length() > "CANCEL_RESERVATION:".length()) {
+                sb.append(";");
+            }
+            sb.append(user);
+        }
+
+        try {
+            out.write(sb.toString());
+            out.newLine();
+            out.flush();
+        } catch (IOException ex) {
+            System.out.println("취소 알림 서버 전송 실패: " + ex.getMessage());
+        }
+    }
+
+    private void saveReservation(String name, String userType, String userId, String userDept,
+            String building, String room, String roomNumber, String date,
+            String dayOfWeek, String start, String end, String purpose, String status) {
+        // 데이터 형식: name, userType, userId, department, building, roomType, roomNumber, date, dayOfWeek, startTime, endTime, purpose, status
         String filePath = "src/main/resources/reservation.txt";
         try (BufferedWriter writer = new BufferedWriter(
-                new OutputStreamWriter(new FileOutputStream(filePath, true), "UTF-8"))) {
-            writer.write(String.join(",", name, userType, userId, department,
-                    roomType, roomNumber, date, dayOfWeek, startTime, endTime,
-                    purpose, status));
+                new OutputStreamWriter(new FileOutputStream(filePath, true), StandardCharsets.UTF_8))) {
+            writer.write(String.join(",", name, userType, userId, userDept, building,
+                    room, roomNumber, date, dayOfWeek, start, end, purpose, status));
             writer.newLine();
         } catch (IOException e) {
-            System.out.println("예약 저장 실패: " + e.getMessage());
+            System.err.println("예약 저장 실패: " + e.getMessage());
         }
     }
 
-    /**
-     * 날짜 문자열 → 한글 요일 반환
-     */
+    public int calculateTotalDuration(List<String> times) {
+        int total = 0;
+        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
+        for (String time : times) {
+            try {
+                String[] parts = time.split("~");
+                Date start = sdf.parse(parts[0]);
+                Date end = sdf.parse(parts[1]);
+                long diff = (end.getTime() - start.getTime()) / (1000 * 60);
+                total += diff;
+            } catch (ParseException e) {
+                System.err.println("시간 파싱 오류: " + time);
+            }
+        }
+        return total;
+    }
+
+    public boolean isUserAlreadyReserved(String userId, String date) {
+        String path = reservationPath;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(path), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",");
+                // parts[2]: userId, parts[7]: date
+                if (parts.length >= 8) {
+                    if (parts[2].equals(userId) && parts[7].equals(date)) {
+                        return true;
+                    }
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("예약 기록 읽기 실패: " + e.getMessage());
+        }
+        return false;
+    }
+
     public String getDayOfWeek(String dateStr) {
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
@@ -681,7 +643,7 @@ public class ReservationGUIController {
         try {
             out.write("INFO_REQUEST:" + userId + "\n");
             out.flush();
-            
+
             //socket.setSoTimeout(5000);
             String response = in.readLine();
             //socket.setSoTimeout(0);
@@ -706,4 +668,61 @@ public class ReservationGUIController {
             System.out.println(" 사용자 정보 요청 실패: " + e.getMessage());
         }
     }
+}
+
+// --- rooms.json 매핑 클래스 ---
+class RoomStaticRoot {
+
+    List<BuildingStatic> buildings;
+}
+
+class BuildingStatic {
+
+    String name;
+    List<FloorStatic> floors;
+}
+
+class FloorStatic {
+
+    String floor;
+    List<String> majors; // 사용하지 않지만 매핑 유지
+    List<RoomStatic> rooms;
+}
+
+class RoomStatic {
+
+    String roomNumber;
+    String type;
+    int capacity;
+    String more; // 사용하지 않지만 매핑 유지
+}
+
+// --- schedules.json 매핑 클래스 ---
+class ScheduleRoot {
+
+    List<ScheduleBuilding> schedules;
+}
+
+class ScheduleBuilding {
+
+    String buildings;
+    List<ScheduleFloor> floors;
+}
+
+class ScheduleFloor {
+
+    String floor;
+    List<ScheduleRoom> roomNumbers;
+}
+
+class ScheduleRoom {
+
+    String roomNumber;
+    List<TimeSlot> timeSlots;
+}
+
+class TimeSlot {
+
+    String time;
+    Map<String, String> availability; // "월": "비어있음"
 }

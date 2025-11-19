@@ -91,7 +91,9 @@ public class LoginController {
                 JOptionPane.showMessageDialog(view, userId + "님 로그인 성공");
 
                 SocketManager.setSocket(socket);  // ← 이 줄을 꼭 먼저 추가
-
+                
+                checkCancelNotification();
+                
                 new FileWatcher().start();
 
                 // 🔽 서버에 유저 정보 요청
@@ -112,7 +114,7 @@ public class LoginController {
                     }
                 }
                 
-                checkCancelNotification();
+                
                 
                 try {
                     if ("admin".equalsIgnoreCase(role)) {
@@ -141,7 +143,9 @@ public class LoginController {
                         JOptionPane.showMessageDialog(view, userId + "님 자동 로그인 성공");
 
                         SocketManager.setSocket(socket);  // ← 이 줄을 꼭 먼저 추가
-
+                        
+                        checkCancelNotification();
+                        
                         new FileWatcher().start();
                         // 서버에 정보 요청
                         out.write("INFO_REQUEST:" + userId);
@@ -154,7 +158,7 @@ public class LoginController {
                         
                     
 
-                        checkCancelNotification();
+                        
 
                         // ✅ 여기서 EDT로 새 창 띄우고 기존 창 닫기
                         SwingUtilities.invokeLater(() -> {
@@ -216,14 +220,15 @@ public class LoginController {
                 String[] parts = notification.split(",");
                 sb.append(String.format("%s님의 %s\n",parts[0],parts[2]));
                 sb.append(String.format("시간: %s",parts[3]));
+                JOptionPane.showMessageDialog(null, sb.toString(), "예약 취소 알림",JOptionPane.WARNING_MESSAGE);
             }
-            JOptionPane.showMessageDialog(null, sb.toString(), "예약 취소 알림",JOptionPane.WARNING_MESSAGE);
+            
             
         }
     }
     
     private void pollingNotification() {
-        int delay = 5000;
+        int delay = 500;
         
         Timer timer = new Timer(delay, e-> {
             checkCancelNotification();

@@ -63,7 +63,7 @@ public class UserReservationListController {
 }
     
     public void loadReservationData() {
-        String[] columns = {"이름", "학번", "강의실", "날짜", "요일", "시작시간", "종료시간", "승인상태"};
+        String[] columns = {"이름", "학번", "건물-강의실", "날짜", "요일", "시작시간", "종료시간", "승인상태"};
         DefaultTableModel model = new DefaultTableModel(columns, 0);
 
         System.out.println("현재 사용자 ID: " + userId); // 디버깅용
@@ -79,12 +79,12 @@ public class UserReservationListController {
              model.addRow(new Object[]{
                 parts[0], // 이름
                 parts[2], // 학번
-                parts[5], // 강의실
-                parts[6], // 날짜 (추가)
-                parts[7], // 요일
-                parts[8], // 시작시간
-                parts[9], // 종료시간
-                parts[11] // 승인상태
+                parts[4] + "-" + parts[6] + "-" + parts[5], // 강의실
+                parts[7], // 날짜 (추가)
+                parts[8], // 요일
+                parts[9], // 시작시간
+                parts[10], // 종료시간
+                parts[12] // 승인상태
                     });
                 }
             }
