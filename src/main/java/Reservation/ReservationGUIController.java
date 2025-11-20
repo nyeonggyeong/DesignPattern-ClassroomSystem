@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import javax.swing.JOptionPane;
 
 /**
  * ReservationGUIController 강의실 예약 시스템의 GUI Controller 클래스 - 사용자 정보 처리 - 엑셀/텍스트
@@ -362,12 +363,30 @@ public class ReservationGUIController {
                     view.showMessage("선택한 시간대에 이미 예약 인원수가 가득 찼습니다.");
                     return;
                 }
+                int totalMinutes = calculateTotalDuration(reserveTimes);
+                if (totalMinutes > 180) {
+                    view.showMessage("총 예약 시간이 3시간(120분)을 초과할 수 없습니다.");
+                    return;
+                }
+                
                 status = "예약확정";
                 saveNewReservation();
                 view.showMessage("예약이 확정되었습니다.");
             } else if ("세미나".equals(reservePurpose)) {
-                //TODO 동반 학생 설정
                 
+                int totalMinutes = calculateTotalDuration(reserveTimes);
+                if (totalMinutes > 180) {
+                    view.showMessage("총 예약 시간이 3시간(120분)을 초과할 수 없습니다.");
+                    return;
+                }
+                
+                //TODO 동반 학생 설정
+                int choice = view.showConfirmDialog("사용자를 지정하시겠습니까?");
+                if (choice == 0) {
+                    openReservationWithStudentView();                 
+                } else {
+                  professorReservation();  
+                }
             } else {
                 professorReservation();
             }
@@ -383,6 +402,12 @@ public class ReservationGUIController {
 
                 if (copyReserved.size() >= max_user) {
                     view.showMessage("선택한 시간대에 이미 예약 인원수가 가득 찼습니다.");
+                    return;
+                }
+                
+                int totalMinutes = calculateTotalDuration(reserveTimes);
+                if (totalMinutes > 180) {
+                    view.showMessage("총 예약 시간이 3시간(120분)을 초과할 수 없습니다.");
                     return;
                 }
 
@@ -407,8 +432,9 @@ public class ReservationGUIController {
         }
     }
 
-    private void saveNewReservation() {
+    public void saveNewReservation() {
         dayOfWeek = getDayOfWeek(reserveDate);
+        boolean result = false;
         for (String time : reserveTimes) {
             String[] split = time.split("~");
             if (split.length == 2) {
@@ -416,14 +442,38 @@ public class ReservationGUIController {
                 String end = split[1].trim();
 
                 // [수정] saveReservation의 인자 순서 변경 및 건물 정보 추가 반영 (총 13개 필드)
-                saveReservation(userName, userType, userId, userDept,
+                result = saveReservation(userName, userType, userId, userDept,
                         selectedRoom.getBuilding(), selectedRoom.getType(), selectedRoom.getRoomNumber(),
                         reserveDate, dayOfWeek, start, end, reservePurpose, status);
+                
+                if (!result) {
+                    view.showMessage("파일 저장이 안되었습니다. 관리자에게 연락해주세요.");
+                } 
             }
         }
         updateAvailableTimes(); // UI 갱신
     }
-
+    
+    private void openReservationWithStudentView() {
+        ReservationWithStudentView studentView = new ReservationWithStudentView();
+        ReservationWithStudentController studentController = new ReservationWithStudentController(
+                in, out, this, selectedRoom, reserveDate, reserveTimes, reservePurpose, userId
+        );
+        studentView.setController(studentController);
+        studentController.setView(studentView);
+        studentView.setVisible(true);
+        
+        view.setVisible(false);
+    }
+    
+    public void setStatus(String status) {
+        this.status = status;
+    }
+    
+    public ReservationView getView() {
+        return this.view;
+    }
+    
     public void professorReservation() {
         // 기존 예약 내역 확인 
         copyReserved = isTimeSlotAlreadyReserved(selectedRoom.getBuilding(), reserveRoomNumber, reserveDate, reserveTimes);
@@ -557,19 +607,24 @@ public class ReservationGUIController {
             System.out.println("취소 알림 서버 전송 실패: " + ex.getMessage());
         }
     }
-
-    private void saveReservation(String name, String userType, String userId, String userDept,
+    //테스트,교수,dhkdrjs,소프트웨어,정보관,강의실,101,2025-11-19,수,10:00,10:50,강의 전용,예약확정
+    public boolean saveReservation(String name, String userType, String userId, String userDept,
             String building, String room, String roomNumber, String date,
             String dayOfWeek, String start, String end, String purpose, String status) {
         // 데이터 형식: name, userType, userId, department, building, roomType, roomNumber, date, dayOfWeek, startTime, endTime, purpose, status
+       
         String filePath = "src/main/resources/reservation.txt";
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(new FileOutputStream(filePath, true), StandardCharsets.UTF_8))) {
+            
             writer.write(String.join(",", name, userType, userId, userDept, building,
                     room, roomNumber, date, dayOfWeek, start, end, purpose, status));
             writer.newLine();
+            
+            return true;
         } catch (IOException e) {
             System.err.println("예약 저장 실패: " + e.getMessage());
+            return false;
         }
     }
 

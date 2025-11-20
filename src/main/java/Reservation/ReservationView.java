@@ -401,4 +401,8 @@ public class ReservationView extends JFrame {
             return "";
         }
     }
+    
+    public int showConfirmDialog(String msg) {
+        return JOptionPane.showConfirmDialog(null, msg, "세미나 예약", JOptionPane.YES_NO_OPTION);
+    }
 }
