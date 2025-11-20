@@ -49,6 +49,7 @@ public class LoginController {
         this.socket = tempSocket;
         this.out = tempOut;
         this.in = tempIn;
+        
         setupListeners();
     }
 
@@ -97,7 +98,7 @@ public class LoginController {
                 String mainRole = "admin".equalsIgnoreCase(userType) ? "admin" : "user";
                 String subRole = "admin".equalsIgnoreCase(userType) ? null : userType;
 
-                Dashboard dashboard = DashboardFactory.createDashboard(mainRole, subRole, userId, socket, out);
+                Dashboard dashboard = DashboardFactory.createDashboard(mainRole, subRole, userId, socket, out, in);
                 dashboard.show();
 
                 view.dispose();

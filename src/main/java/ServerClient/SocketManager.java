@@ -8,12 +8,16 @@ package ServerClient;
  *
  * @author adsd3
  */
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.net.Socket;
 
 public class SocketManager {
     private static Socket socket;
-
+    private BufferedReader in;
+    private BufferedWriter out;
+    
     public static synchronized void setSocket(Socket s) {
         socket = s;
     }
@@ -36,4 +40,12 @@ public class SocketManager {
             }
         }
     }
+    
+    public void setReader(BufferedReader in) { this.in = in; }
+    
+    public void setWriter(BufferedWriter out) { this.out = out; }
+    
+    public BufferedReader getReader() { return in; }
+    
+    public BufferedWriter getWriter() { return out; }
 }
