@@ -13,9 +13,9 @@ public class LoginController {
 
     private final LoginView view;
     private final LoginModel model;
-    private final Socket socket;
-    private final BufferedWriter out;
-    private final BufferedReader in;
+    private Socket socket;
+    private BufferedWriter out;
+    private BufferedReader in;
 //    private Thread listener; //알람 수신 스레드
     
     public LoginController(LoginView view, LoginModel model) {
@@ -27,26 +27,29 @@ public class LoginController {
         BufferedReader tempIn = null;
 
         if (tempSocket == null || tempSocket.isClosed()) {
-            JOptionPane.showMessageDialog(view, "서버에 연결되어 있지 않습니다.", "연결 오류", JOptionPane.ERROR_MESSAGE);
-            this.socket = null;
-            this.out = null;
-            this.in = null;
-            return;
+            String ip = "127.0.0.1";
+            try {
+                SocketManager.connect(ip);
+                tempSocket = SocketManager.getSocket();
+                new FileWatcher().start();
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(view, "서버 재연결 실패: " + ex.getMessage());
+                return;
+            }     
         }
 
         try {
             tempOut = new BufferedWriter(new OutputStreamWriter(tempSocket.getOutputStream()));
             tempIn = new BufferedReader(new InputStreamReader(tempSocket.getInputStream()));
+            this.socket = tempSocket;
         } catch (IOException e) {
             JOptionPane.showMessageDialog(view, "스트림 생성 실패: " + e.getMessage(), "스트림 오류", JOptionPane.ERROR_MESSAGE);
-            SocketManager.close();
+            SocketManager.close(); 
             this.socket = null;
             this.out = null;
             this.in = null;
             return;
         }
-
-        this.socket = tempSocket;
         this.out = tempOut;
         this.in = tempIn;
         
@@ -143,8 +146,12 @@ public class LoginController {
             String[] notifications = data.split(";");
             
             StringBuilder sb = new StringBuilder();
-            sb.append("교수님의 예약으로 인해 다음 예약이 취소되었습니다.\n");
+            
             for (String notification : notifications) {
+                if (sb.length() > 0) {
+                    sb.setLength(0);
+                }
+                sb.append("교수님의 예약으로 인해 다음 예약이 취소되었습니다.\n");
                 String[] parts = notification.split(",");
                 sb.append(String.format("%s님의 %s\n",parts[0],parts[2]));
                 sb.append(String.format("시간: %s",parts[3]));

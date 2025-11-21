@@ -60,6 +60,7 @@ public class UserReservationCancelController {
         
         // 예약 취소 처리
         boolean cancelSuccess = model.cancelReservation(userId, date, room);
+        System.out.println(userId + " " + date + " " + room);
         if (!cancelSuccess) {
             view.showError("예약 취소 처리 중 오류가 발생했습니다.");
             return;

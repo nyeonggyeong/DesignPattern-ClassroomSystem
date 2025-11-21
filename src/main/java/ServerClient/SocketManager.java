@@ -37,8 +37,19 @@ public class SocketManager {
                 System.out.println("[SocketManager] 소켓 닫힘");
             } catch (IOException e) {
                 e.printStackTrace();
+            } finally {
+                socket = null;
             }
         }
+    }
+    
+    public static void connect(String ip) throws IOException {
+        close();
+        
+        Socket newSocket = new Socket(ip, 5000);
+        setSocket(newSocket);
+        
+        System.out.println("[SocketManager] 서버 연결 성공: " + ip);
     }
     
     public void setReader(BufferedReader in) { this.in = in; }

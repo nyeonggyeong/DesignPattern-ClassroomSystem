@@ -141,6 +141,15 @@ public class UserMainController {
         if (result == JOptionPane.YES_OPTION) {
             shutdownAllNotificationSystems(); // 알림 모두 정리
             view.dispose();
+            try {
+                out.write("LOGOUT");
+                out.newLine();
+                out.flush();
+                
+                socket.close();
+            } catch (IOException ex) {
+                System.out.println("에러발생: " + ex.getMessage());           
+            }
             login.LoginView loginView = new login.LoginView();
             login.LoginModel loginModel = new login.LoginModel();
             new login.LoginController(loginView, loginModel);

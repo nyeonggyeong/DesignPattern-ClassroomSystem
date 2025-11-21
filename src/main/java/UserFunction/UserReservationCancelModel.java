@@ -28,9 +28,11 @@ public class UserReservationCancelModel {
             
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split(",");
-                // parts[2]: userId, parts[6]: date, parts[5]: roomNumber
+                //테스트,교수,dhkdrjs,소프트웨어,산학협력관,강의실,401,2025-11-21,금,12:00,12:50,세미나,예약확정
+                // 정보관-101-강의실
+                String[] partRoom = room.split("-");
                 if (parts.length >= 12 && parts[2].equals(userId) && 
-                    parts[6].equals(date) && parts[5].equals(room)) {
+                    parts[7].equals(date) && parts[4].equals(partRoom[0]) && parts[5].equals(partRoom[2]) && parts[6].equals(partRoom[1])) {
                     found = true; // 삭제할 예약 찾음
                 } else {
                     updatedReservations.add(line); // 유지할 예약

@@ -55,17 +55,11 @@ public class ConnectView extends javax.swing.JFrame {
 
         // “서버 연결” 버튼 클릭 리스너
         connectButton.addActionListener((ActionEvent e) -> {
-            String ip = ipField.getText().trim();
-            int port = 5000; 
+            String ip = ipField.getText().trim(); 
             try {
                 // 1) 실제 서버에 Socket 연결
-                Socket socket = new Socket(ip, port);
+                SocketManager.connect(ip);
                 
-                // 2) SocketManager에 set → 전역에서 재사용 가능
-                SocketManager.setSocket(socket);
-                System.out.println("[ConnectView] 서버와 연결되었습니다: " + ip + ":" + port);
-
-                // 3) FileWatcher 시작 (예: 파일 동기화가 필요하다면)
                 new FileWatcher().start();
 
                 // 4) 로그인 화면으로 넘어가기 (IP 입력 칸 없음)
