@@ -4,6 +4,7 @@
  */
 package management;
 
+import management.state.ReservationContext;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
@@ -71,46 +72,55 @@ public class ReservationMgmtController {
 
             String line;
             while ((line = reader.readLine()) != null) {
+
                 String[] data = line.split(",");
-
-                if (data.length >= 13) {
-                    String name = data[0];
-                    String userType = data[1];
-                    String studentId = data[2];
-                    String department = data[3];
-                    String building = data[4];
-                    String roomType = data[5];
-                    String roomNumber = data[6];
-                    String date = data[7];
-                    String day = data[8];
-                    String startTime = data[9];
-                    String endTime = data[10];
-                    String purpose = data[11]; // 예약 목적
-                    String approved = data[12]; 
-
-                    String displayName = name + " (" + userType + ")";
-                    String roomDisplay = building + " / " + roomNumber;
-                    String timeDisplay = startTime + " ~ " + endTime;
-
-                    ReservationMgmtModel model = modelCache.get(studentId);
-
-                    if (model == null) {
-                        model = new ReservationMgmtModel(
-                                displayName,
-                                studentId,
-                                department,
-                                roomDisplay,
-                                date,
-                                timeDisplay,
-                                approved
-                        );
-                        modelCache.put(studentId, model);
-                    } else {
-                        model.setApproved(approved);
-                    }
-
-                    reservations.add(model);
+                if (data.length < 13) {
+                    continue;
                 }
+
+                String name = data[0];
+                String userType = data[1];
+                String studentId = data[2];
+                String department = data[3];
+                String building = data[4];
+                String roomType = data[5];
+                String roomNumber = data[6];
+                String date = data[7];
+                String day = data[8];
+                String startTime = data[9];
+                String endTime = data[10];
+                String purpose = data[11];
+                String approved = data[12];   // 예약 상태 → State 패턴에서 context로 전환됨
+
+                String displayName = name + " (" + userType + ")";
+                String roomDisplay = building + " / " + roomNumber;
+                String timeDisplay = startTime + " ~ " + endTime;
+
+                ReservationMgmtModel model = modelCache.get(studentId);
+
+                if (model == null) {
+                    // 최초 생성
+                    model = new ReservationMgmtModel(
+                            displayName, studentId, department,
+                            roomDisplay, date, timeDisplay, approved
+                    );
+                    modelCache.put(studentId, model);
+
+                } else {
+                    // State 패턴 반영 (승인/거절/예약대기)
+                    if (!model.getApproved().equals(approved)) {
+
+                        if (approved.equals("승인")) {
+                            model.approve();
+                        } else if (approved.equals("거절")) {
+                            model.reject();
+                        } else {
+                            model.setPending();
+                        }
+                    }
+                }
+
+                reservations.add(model);
             }
 
         } catch (IOException e) {
@@ -157,7 +167,13 @@ public class ReservationMgmtController {
         if (found) {
             ReservationMgmtModel model = modelCache.get(studentId);
             if (model != null) {
-                model.setApproved(newStatus); // Model이 Subject로서 이벤트 발행
+                if (newStatus.equals("승인")) {
+                    model.approve();
+                } else if (newStatus.equals("거절")) {
+                    model.reject();
+                } else {
+                    model.setPending();
+                }
                 appendApprovalNotification(model);
             } else {
                 // 캐시에 없으면 재로딩으로 동기화
