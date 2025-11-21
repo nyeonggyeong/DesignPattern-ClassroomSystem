@@ -72,27 +72,47 @@ public class ReservationMgmtController {
             String line;
             while ((line = reader.readLine()) != null) {
                 String[] data = line.split(",");
-                if (data.length >= 12) {
+
+                if (data.length >= 13) {
                     String name = data[0];
+                    String userType = data[1];
                     String studentId = data[2];
                     String department = data[3];
-                    String room = data[4];
-                    String date = data[6];
-                    String time = data[8] + "~" + data[9];
-                    String approved = data[11];
+                    String building = data[4];
+                    String roomType = data[5];
+                    String roomNumber = data[6];
+                    String date = data[7];
+                    String day = data[8];
+                    String startTime = data[9];
+                    String endTime = data[10];
+                    String purpose = data[11]; // 예약 목적
+                    String approved = data[12]; 
 
-                    ReservationMgmtModel m = modelCache.get(studentId);
-                    if (m == null) {
-                        m = new ReservationMgmtModel(name, studentId, department, room, date, time, approved);
-                        modelCache.put(studentId, m);
+                    String displayName = name + " (" + userType + ")";
+                    String roomDisplay = building + " / " + roomNumber;
+                    String timeDisplay = startTime + " ~ " + endTime;
+
+                    ReservationMgmtModel model = modelCache.get(studentId);
+
+                    if (model == null) {
+                        model = new ReservationMgmtModel(
+                                displayName,
+                                studentId,
+                                department,
+                                roomDisplay,
+                                date,
+                                timeDisplay,
+                                approved
+                        );
+                        modelCache.put(studentId, model);
                     } else {
-
-                        m.setApproved(approved);
+                        model.setApproved(approved);
                     }
 
-                    reservations.add(m);
+                    reservations.add(model);
                 }
             }
+
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -111,8 +131,8 @@ public class ReservationMgmtController {
             String line;
             while ((line = reader.readLine()) != null) {
                 String[] data = line.split(",");
-                if (data.length >= 12 && data[2].equals(studentId)) {
-                    data[11] = newStatus;
+                if (data.length >= 13 && data[2].equals(studentId)) {
+                    data[12] = newStatus;
                     found = true;
                     updatedLines.add(String.join(",", data));
                 } else {

@@ -15,8 +15,7 @@ import java.beans.PropertyChangeSupport;
 public class ReservationMgmtModel {
 
     
-    private final PropertyChangeSupport pcs = new PropertyChangeSupport(this);
-
+    private final PropertyChangeSupport pcs = new PropertyChangeSupport(this); // subject
 
     private String name;
     private String studentId;
@@ -35,16 +34,6 @@ public class ReservationMgmtModel {
         this.time = time;
         this.approved = approved;
     }
-
-
-    public void addListener(PropertyChangeListener l) {
-        pcs.addPropertyChangeListener(l);
-    }
-
-    public void removeListener(PropertyChangeListener l) {
-        pcs.removePropertyChangeListener(l);
-    }
-
 
     public String getName() {
         return name;
@@ -81,7 +70,15 @@ public class ReservationMgmtModel {
             return;
         }
         this.approved = approved;
-       pcs.firePropertyChange("approvalChanged", old, approved);
+       pcs.firePropertyChange("approvalChanged", old, approved); // 예약 승인 상태가 바뀌면 옵저버에게 알림
+    }
+    
+    public void addListener(PropertyChangeListener l) {
+        pcs.addPropertyChangeListener(l);
+    }
+
+    public void removeListener(PropertyChangeListener l) {
+        pcs.removePropertyChangeListener(l);
     }
 
 }
