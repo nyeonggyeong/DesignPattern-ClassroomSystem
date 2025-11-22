@@ -90,7 +90,7 @@ public class ReservationMgmtController {
                 String startTime = data[9];
                 String endTime = data[10];
                 String purpose = data[11];
-                String approved = data[12];   // 예약 상태 → State 패턴에서 context로 전환됨
+                String approved = data[12];   // 예약 상태
 
                 String displayName = name + " (" + userType + ")";
                 String roomDisplay = building + " / " + roomNumber;
@@ -178,7 +178,7 @@ public class ReservationMgmtController {
                     appendApprovalNotification(model);
 
                 } else if (newStatus.equals("관리자취소")) {
-                    model.cancelByAdmin();   // ✅ 이것만 추가
+                    model.cancelByAdmin(); 
                 } else {
                     model.setPending();
                 }
