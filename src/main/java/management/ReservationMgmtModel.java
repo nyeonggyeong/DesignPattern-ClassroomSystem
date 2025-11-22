@@ -97,4 +97,10 @@ public class ReservationMgmtModel {
         context.setState(context.getPendingState());
         pcs.firePropertyChange("approvalChanged", old, getApproved());
     }
+
+    public void cancelByAdmin() {
+        String old = getApproved();
+        context.setState(context.getAdminCanceledState());
+        pcs.firePropertyChange("approvalChanged", old, getApproved());
+    }
 }

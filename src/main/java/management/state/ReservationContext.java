@@ -13,6 +13,7 @@ public class ReservationContext {
     private final ReservationState pendingState = new PendingState();
     private final ReservationState approvedState = new ApprovedState();
     private final ReservationState rejectedState = new RejectedState();
+    private final ReservationState adminCanceledState = new AdminCanceledState();
 
     private ReservationState state;
 
@@ -23,6 +24,9 @@ public class ReservationContext {
                 break;
             case "거절":
                 state = rejectedState;
+                break;
+            case "관리자취소":
+                state = adminCanceledState;
                 break;
             default:
                 state = pendingState;
@@ -51,6 +55,10 @@ public class ReservationContext {
 
     public ReservationState getRejectedState() {
         return rejectedState;
+    }
+
+    public ReservationState getAdminCanceledState() {
+        return adminCanceledState;
     }
 
     public String getStatusName() {

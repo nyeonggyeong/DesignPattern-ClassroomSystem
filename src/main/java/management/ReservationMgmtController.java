@@ -107,13 +107,13 @@ public class ReservationMgmtController {
                     modelCache.put(studentId, model);
 
                 } else {
-                    // State 패턴 반영 (승인/거절/예약대기)
                     if (!model.getApproved().equals(approved)) {
-
                         if (approved.equals("승인")) {
                             model.approve();
                         } else if (approved.equals("거절")) {
                             model.reject();
+                        } else if (approved.equals("관리자취소")) {
+                            model.cancelByAdmin();  
                         } else {
                             model.setPending();
                         }
@@ -166,17 +166,23 @@ public class ReservationMgmtController {
 
         if (found) {
             ReservationMgmtModel model = modelCache.get(studentId);
+
             if (model != null) {
+
                 if (newStatus.equals("승인")) {
                     model.approve();
+                    appendApprovalNotification(model);
+
                 } else if (newStatus.equals("거절")) {
                     model.reject();
+                    appendApprovalNotification(model);
+
+                } else if (newStatus.equals("관리자취소")) {
+                    model.cancelByAdmin();   // ✅ 이것만 추가
                 } else {
                     model.setPending();
                 }
-                appendApprovalNotification(model);
             } else {
-                // 캐시에 없으면 재로딩으로 동기화
                 getAllReservations();
             }
         }
@@ -281,4 +287,18 @@ public class ReservationMgmtController {
         return filtered;
     }
 
+    public void cancelReservationByAdmin(String studentId, String reason) {
+
+        updateApprovalStatus(studentId, "관리자취소");
+
+        String line = String.join(",", studentId, "관리자취소", reason);
+
+        try (BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream("src/main/resources/cancel_notify.txt", true), StandardCharsets.UTF_8))) {
+            writer.write(line);
+            writer.newLine();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
