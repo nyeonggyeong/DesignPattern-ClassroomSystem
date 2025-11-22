@@ -3,19 +3,16 @@ package Reservation;
 import ServerClient.LogoutUtil;
 import UserFunction.UserMainController;
 import com.google.gson.Gson;
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.awt.event.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import javax.swing.JOptionPane;
+
 
 /**
  * ReservationGUIController 강의실 예약 시스템의 GUI Controller 클래스 - 사용자 정보 처리 - 엑셀/텍스트
@@ -50,6 +47,8 @@ public class ReservationGUIController {
     private String dayOfWeek;
     private String status;
     private String reserveRoomNumber;
+    
+    private ReservationRepository reservationRepository;
 
 //클라이언트-서버 연결 코드(로그인과 사용자 페이지 연결되면 주석 해제)
     public ReservationGUIController(String userId, String name, String dept, String type,
@@ -62,7 +61,8 @@ public class ReservationGUIController {
         this.in = in;
         this.out = out;
         System.out.println("사용자ID:" + this.userId + "사용자 이름: " + userName + "사용자Dept: " + userDept);
-
+        
+        reservationRepository = new ReservationRepository();
         view = new ReservationView();
 
         // 서버에서 사용자 정보 불러오기
@@ -434,22 +434,43 @@ public class ReservationGUIController {
 
     public void saveNewReservation() {
         dayOfWeek = getDayOfWeek(reserveDate);
-        boolean result = false;
+        
+        List<Reservation> reservations = new ArrayList<>();
+        
         for (String time : reserveTimes) {
             String[] split = time.split("~");
             if (split.length == 2) {
                 String start = split[0].trim();
                 String end = split[1].trim();
-
-                // [수정] saveReservation의 인자 순서 변경 및 건물 정보 추가 반영 (총 13개 필드)
-                result = saveReservation(userName, userType, userId, userDept,
-                        selectedRoom.getBuilding(), selectedRoom.getType(), selectedRoom.getRoomNumber(),
-                        reserveDate, dayOfWeek, start, end, reservePurpose, status);
                 
-                if (!result) {
-                    view.showMessage("파일 저장이 안되었습니다. 관리자에게 연락해주세요.");
-                } 
+                try {
+                    // Builder 패턴으로 예약 객체 생성
+                    Reservation reservation = new Reservation.Builder(
+                                userName, // name
+                                userType, // userType
+                                userId, // userId
+                                userDept, // userDept
+                                selectedRoom.getBuilding(), // building
+                                selectedRoom.getRoomNumber(), // roomNumber
+                                reserveDate, // date
+                                start, // startTime
+                                end // endTime
+                        ).roomType(selectedRoom.getType()).dayOfWeek(dayOfWeek).purpose(reservePurpose).status(status).build();
+                    
+                    reservations.add(reservation);
+                    
+                } catch (IllegalArgumentException e) {
+                    view.showMessage("예약 정보 검증 실패: " + e.getMessage());
+                    return;
+                }
             }
+        }
+        
+        // Repository를 통한 일괄 저장
+        boolean result = reservationRepository.saveAll(reservations);
+        
+        if (!result) {
+            view.showMessage("파일 저장이 안되었습니다. 관리자에게 연락해주세요.");
         }
         updateAvailableTimes(); // UI 갱신
     }
@@ -493,81 +514,40 @@ public class ReservationGUIController {
     }
 
     public List<String[]> isTimeSlotAlreadyReserved(String building, String roomNumber, String date, List<String> newTimes) {
-        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
-        List<String[]> conflict = new ArrayList<>();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(reservationPath), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String[] parts = line.split(",");
-                // parts[4]: 건물, parts[6]: 방번호, parts[7]: 날짜, parts[9]: 시작시간, parts[10]: 끝시간
-                if (parts.length >= 13) {
-                    String reservedBuilding = parts[4];
-                    String reservedRoom = parts[6];
-                    String reservedDate = parts[7];
-                    String reservedStart = parts[9];
-                    String reservedEnd = parts[10];
-
-                    if (reservedBuilding.equals(building) && reservedRoom.equals(roomNumber) && reservedDate.equals(date)) {
-                        Date reservedStartTime = sdf.parse(reservedStart);
-                        Date reservedEndTime = sdf.parse(reservedEnd);
-
-                        for (String timeSlot : newTimes) {
-                            String[] range = timeSlot.split("~");
-                            if (range.length == 2) {
-                                Date newStartTime = sdf.parse(range[0].trim());
-                                Date newEndTime = sdf.parse(range[1].trim());
-
-                                // 중복 조건: 시작 시간이 기존 예약의 끝 이전 && 끝 시간이 기존 예약의 시작 이후
-                                if (newStartTime.before(reservedEndTime) && newEndTime.after(reservedStartTime)) {
-                                    conflict.add(parts);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            System.out.println("중복 시간 검사 오류: " + e.getMessage());
-        }
-
-        return conflict;
+        List<Reservation> conflicts = reservationRepository.findConflictReservation(building, roomNumber, date, newTimes);
+        
+        return conflicts.stream()
+                .map(r -> new String[]{
+                    r.getName(),           // 0
+                    r.getUserType(),       // 1
+                    r.getUserId(),         // 2
+                    r.getUserDept(),       // 3
+                    r.getBuilding(),       // 4
+                    r.getRoomType(),       // 5
+                    r.getRoomNumber(),     // 6
+                    r.getDate(),           // 7
+                    r.getDayOfWeek(),      // 8
+                    r.getStartTime(),      // 9
+                    r.getEndTime(),        // 10
+                    r.getPurpose(),        // 11
+                    r.getStatus()          // 12
+                })
+                .collect(Collectors.toList());
     }
 
     public void removeReservation() {
         if (copyReserved.isEmpty()) {
             return;
         }
-
-        // lines에는 삭제할 예약 레코드 전체 문자열이 포함되어야 함
-        Set<String> linesToRemove = copyReserved.stream()
-                .map(parts -> String.join(",", parts))
-                .collect(Collectors.toSet());
-
-        Path tempPath = null;
-        try {
-            tempPath = Files.createTempFile("tempReservations", ".txt");
-            Path targetPath = Paths.get(reservationPath);
-
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(targetPath.toFile()), StandardCharsets.UTF_8)); BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(tempPath.toFile()), StandardCharsets.UTF_8))) {
-
-                String currentLine;
-                while ((currentLine = reader.readLine()) != null) {
-                    if (!linesToRemove.contains(currentLine.trim())) {
-                        writer.write(currentLine);
-                        writer.newLine();
-                    }
-                }
-            }
-            Files.move(tempPath, targetPath, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException ex) {
-            System.out.println("예약 삭제 및 파일 재작성 실패: " + ex.getMessage());
-            if (tempPath != null) {
-                try {
-                    Files.deleteIfExists(tempPath);
-                } catch (Exception e) {
-                    /* ignore */ }
-            }
+        // String[] 배열을 Reservation 객체로 변환
+        List<Reservation> reservationsToDelete = 
+            reservationRepository.convertFromStringArrayList(copyReserved);
+        
+        // Repository를 통한 삭제
+        boolean result = reservationRepository.delete(reservationsToDelete);
+        
+        if (!result) {
+            System.err.println("예약 삭제 실패");
         }
     }
 
@@ -608,25 +588,25 @@ public class ReservationGUIController {
         }
     }
     //테스트,교수,dhkdrjs,소프트웨어,정보관,강의실,101,2025-11-19,수,10:00,10:50,강의 전용,예약확정
-    public boolean saveReservation(String name, String userType, String userId, String userDept,
-            String building, String room, String roomNumber, String date,
-            String dayOfWeek, String start, String end, String purpose, String status) {
-        // 데이터 형식: name, userType, userId, department, building, roomType, roomNumber, date, dayOfWeek, startTime, endTime, purpose, status
-       
-        String filePath = "src/main/resources/reservation.txt";
-        try (BufferedWriter writer = new BufferedWriter(
-                new OutputStreamWriter(new FileOutputStream(filePath, true), StandardCharsets.UTF_8))) {
-            
-            writer.write(String.join(",", name, userType, userId, userDept, building,
-                    room, roomNumber, date, dayOfWeek, start, end, purpose, status));
-            writer.newLine();
-            
-            return true;
-        } catch (IOException e) {
-            System.err.println("예약 저장 실패: " + e.getMessage());
-            return false;
-        }
-    }
+//    public boolean saveReservation(String name, String userType, String userId, String userDept,
+//            String building, String room, String roomNumber, String date,
+//            String dayOfWeek, String start, String end, String purpose, String status) {
+//        // 데이터 형식: name, userType, userId, department, building, roomType, roomNumber, date, dayOfWeek, startTime, endTime, purpose, status
+//       
+//        String filePath = "src/main/resources/reservation.txt";
+//        try (BufferedWriter writer = new BufferedWriter(
+//                new OutputStreamWriter(new FileOutputStream(filePath, true), StandardCharsets.UTF_8))) {
+//            
+//            writer.write(String.join(",", name, userType, userId, userDept, building,
+//                    room, roomNumber, date, dayOfWeek, start, end, purpose, status));
+//            writer.newLine();
+//            
+//            return true;
+//        } catch (IOException e) {
+//            System.err.println("예약 저장 실패: " + e.getMessage());
+//            return false;
+//        }
+//    }
 
     public int calculateTotalDuration(List<String> times) {
         int total = 0;
@@ -646,22 +626,7 @@ public class ReservationGUIController {
     }
 
     public boolean isUserAlreadyReserved(String userId, String date) {
-        String path = reservationPath;
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(path), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String[] parts = line.split(",");
-                // parts[2]: userId, parts[7]: date
-                if (parts.length >= 8) {
-                    if (parts[2].equals(userId) && parts[7].equals(date)) {
-                        return true;
-                    }
-                }
-            }
-        } catch (IOException e) {
-            System.err.println("예약 기록 읽기 실패: " + e.getMessage());
-        }
-        return false;
+        return reservationRepository.exists(userId, date);
     }
 
     public String getDayOfWeek(String dateStr) {

@@ -23,6 +23,7 @@ public class ReservationWithStudentController {
     private BufferedWriter out;
     private ReservationWithStudentView view;
     private ReservationGUIController parentController;
+    private ReservationRepository repository;
     
     private RoomModel selectedRoom;
     private String reserveDate;
@@ -43,6 +44,7 @@ public class ReservationWithStudentController {
         this.professorId = professorId;
         this.studentList = new ArrayList<>();
         this.selectedStudents = new ArrayList<>();
+        this.repository = new ReservationRepository();
         initializeUserInfoFromServer();
     }
     
@@ -115,8 +117,8 @@ public class ReservationWithStudentController {
     }
     
     public void saveStudentReservation() {
-        boolean result = false;
         String dayOfWeek = parentController.getDayOfWeek(reserveDate);
+        List<Reservation> studentReservations = new ArrayList<>();
         
         for (String[] s : selectedStudents) {
             String id = s[0];
@@ -128,17 +130,43 @@ public class ReservationWithStudentController {
                 if (parts.length == 2) {
                     String start = parts[0].trim();
                     String end = parts[1].trim();
-                    result = parentController.saveReservation(name, "학생", id, dept, 
-                        selectedRoom.getBuilding(), selectedRoom.getType(),selectedRoom.getRoomNumber(), reserveDate, 
-                        dayOfWeek, start, end, reservePurpose, "예약확정"
-                    );
+                    
+                    try {
+                        // ✅ Builder 패턴 사용
+                        Reservation reservation = new Reservation.Builder(
+                                name,
+                                "학생",
+                                id,
+                                dept,
+                                selectedRoom.getBuilding(),
+                                selectedRoom.getRoomNumber(),
+                                reserveDate,
+                                start,
+                                end
+                            )
+                            .roomType(selectedRoom.getType())
+                            .dayOfWeek(dayOfWeek)
+                            .purpose(reservePurpose)
+                            .status("예약확정")
+                            .build();
+                        
+                        studentReservations.add(reservation);
+                        
+                    } catch (IllegalArgumentException e) {
+                        view.showMessage("학생 예약 생성 실패: " + e.getMessage());
+                        return;
+                    }
                 }
             }
-            if (!result) {
-                view.showMessage(name + "학생 예약 등록이 실패했습니다.");                
-            } else {
-                view.showMessage(name + "학생 예약 등록 완료했습니다.");
-            }
+        }
+        
+        // 일괄 저장
+        boolean result = repository.saveAll(studentReservations);
+        
+        if (result) {
+            view.showMessage(selectedStudents.size() + "명의 학생 예약이 완료되었습니다.");
+        } else {
+            view.showMessage("학생 예약 저장에 실패했습니다.");
         }        
     }
     
