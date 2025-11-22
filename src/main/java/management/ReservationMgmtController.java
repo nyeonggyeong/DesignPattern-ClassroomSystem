@@ -4,6 +4,7 @@
  */
 package management;
 
+import management.state.ReservationContext;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
@@ -71,28 +72,57 @@ public class ReservationMgmtController {
 
             String line;
             while ((line = reader.readLine()) != null) {
+
                 String[] data = line.split(",");
-                if (data.length >= 12) {
-                    String name = data[0];
-                    String studentId = data[2];
-                    String department = data[3];
-                    String room = data[4];
-                    String date = data[6];
-                    String time = data[8] + "~" + data[9];
-                    String approved = data[11];
-
-                    ReservationMgmtModel m = modelCache.get(studentId);
-                    if (m == null) {
-                        m = new ReservationMgmtModel(name, studentId, department, room, date, time, approved);
-                        modelCache.put(studentId, m);
-                    } else {
-
-                        m.setApproved(approved);
-                    }
-
-                    reservations.add(m);
+                if (data.length < 13) {
+                    continue;
                 }
+
+                String name = data[0];
+                String userType = data[1];
+                String studentId = data[2];
+                String department = data[3];
+                String building = data[4];
+                String roomType = data[5];
+                String roomNumber = data[6];
+                String date = data[7];
+                String day = data[8];
+                String startTime = data[9];
+                String endTime = data[10];
+                String purpose = data[11];
+                String approved = data[12];   // 예약 상태
+
+                String displayName = name + " (" + userType + ")";
+                String roomDisplay = building + " / " + roomNumber;
+                String timeDisplay = startTime + " ~ " + endTime;
+
+                ReservationMgmtModel model = modelCache.get(studentId);
+
+                if (model == null) {
+                    // 최초 생성
+                    model = new ReservationMgmtModel(
+                            displayName, studentId, department,
+                            roomDisplay, date, timeDisplay, approved
+                    );
+                    modelCache.put(studentId, model);
+
+                } else {
+                    if (!model.getApproved().equals(approved)) {
+                        if (approved.equals("승인")) {
+                            model.approve();
+                        } else if (approved.equals("거절")) {
+                            model.reject();
+                        } else if (approved.equals("관리자취소")) {
+                            model.cancelByAdmin();  
+                        } else {
+                            model.setPending();
+                        }
+                    }
+                }
+
+                reservations.add(model);
             }
+
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -111,8 +141,8 @@ public class ReservationMgmtController {
             String line;
             while ((line = reader.readLine()) != null) {
                 String[] data = line.split(",");
-                if (data.length >= 12 && data[2].equals(studentId)) {
-                    data[11] = newStatus;
+                if (data.length >= 13 && data[2].equals(studentId)) {
+                    data[12] = newStatus;
                     found = true;
                     updatedLines.add(String.join(",", data));
                 } else {
@@ -136,11 +166,23 @@ public class ReservationMgmtController {
 
         if (found) {
             ReservationMgmtModel model = modelCache.get(studentId);
+
             if (model != null) {
-                model.setApproved(newStatus); // Model이 Subject로서 이벤트 발행
-                appendApprovalNotification(model);
+
+                if (newStatus.equals("승인")) {
+                    model.approve();
+                    appendApprovalNotification(model);
+
+                } else if (newStatus.equals("거절")) {
+                    model.reject();
+                    appendApprovalNotification(model);
+
+                } else if (newStatus.equals("관리자취소")) {
+                    model.cancelByAdmin(); 
+                } else {
+                    model.setPending();
+                }
             } else {
-                // 캐시에 없으면 재로딩으로 동기화
                 getAllReservations();
             }
         }
@@ -245,4 +287,18 @@ public class ReservationMgmtController {
         return filtered;
     }
 
+    public void cancelReservationByAdmin(String studentId, String reason) {
+
+        updateApprovalStatus(studentId, "관리자취소");
+
+        String line = String.join(",", studentId, "관리자취소", reason);
+
+        try (BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream("src/main/resources/cancel_notify.txt", true), StandardCharsets.UTF_8))) {
+            writer.write(line);
+            writer.newLine();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }

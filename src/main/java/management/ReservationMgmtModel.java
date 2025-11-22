@@ -7,6 +7,7 @@ package management;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 
+import management.state.ReservationContext;
 
 /**
  *
@@ -14,9 +15,7 @@ import java.beans.PropertyChangeSupport;
  */
 public class ReservationMgmtModel {
 
-    
     private final PropertyChangeSupport pcs = new PropertyChangeSupport(this);
-
 
     private String name;
     private String studentId;
@@ -24,27 +23,23 @@ public class ReservationMgmtModel {
     private String room;
     private String date;
     private String time;
-    private String approved;
 
-    public ReservationMgmtModel(String name, String studentId, String department, String room, String date, String time, String approved) {
+    // 🔥 State 패턴 적용
+    private ReservationContext context;
+
+    public ReservationMgmtModel(String name, String studentId, String department,
+            String room, String date, String time, String approved) {
+
         this.name = name;
         this.studentId = studentId;
         this.department = department;
         this.room = room;
         this.date = date;
         this.time = time;
-        this.approved = approved;
+
+        // 🔥 approved 문자열 → State context로 변환
+        this.context = new ReservationContext(approved);
     }
-
-
-    public void addListener(PropertyChangeListener l) {
-        pcs.addPropertyChangeListener(l);
-    }
-
-    public void removeListener(PropertyChangeListener l) {
-        pcs.removePropertyChangeListener(l);
-    }
-
 
     public String getName() {
         return name;
@@ -70,18 +65,42 @@ public class ReservationMgmtModel {
         return time;
     }
 
+    // 🔥 상태를 문자열로 반환 (State 내부에서 관리)
     public String getApproved() {
-        return approved;
+        return context.getStatusName();
     }
 
-    public void setApproved(String approved) {
-
-        String old = this.approved;
-        if ((old == null && approved == null) || (old != null && old.equals(approved))) {
-            return;
-        }
-        this.approved = approved;
-       pcs.firePropertyChange("approvalChanged", old, approved);
+    // 🔥 State 기반 승인 처리
+    public void approve() {
+        String old = getApproved();
+        context.approve();
+        pcs.firePropertyChange("approvalChanged", old, getApproved());
     }
 
+    // 🔥 State 기반 거절 처리
+    public void reject() {
+        String old = getApproved();
+        context.reject();
+        pcs.firePropertyChange("approvalChanged", old, getApproved());
+    }
+
+    public void addListener(PropertyChangeListener l) {
+        pcs.addPropertyChangeListener(l);
+    }
+
+    public void removeListener(PropertyChangeListener l) {
+        pcs.removePropertyChangeListener(l);
+    }
+
+    public void setPending() {
+        String old = getApproved();
+        context.setState(context.getPendingState());
+        pcs.firePropertyChange("approvalChanged", old, getApproved());
+    }
+
+    public void cancelByAdmin() {
+        String old = getApproved();
+        context.setState(context.getAdminCanceledState());
+        pcs.firePropertyChange("approvalChanged", old, getApproved());
+    }
 }

@@ -15,6 +15,7 @@ import javax.swing.JComboBox;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
+import javax.swing.Timer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import java.beans.PropertyChangeListener;
@@ -36,51 +37,67 @@ public class ReservationMgmtView extends javax.swing.JFrame {
 
     private final List<ReservationMgmtModel> currentModels = new ArrayList<>();
     private final NotificationController notificationController = new NotificationController();
-    private final ReservationMgmtController controller = new ReservationMgmtController();
+    private ReservationMgmtController controller;
     private boolean suppressTableListener = false;
     private boolean isApplyingApproval = false;
     private BufferedReader in;
     private BufferedWriter out;
+    private Timer autoRefreshTimer;
 
+    // Observer: 테이블 값을 자동으로 갱신
     private final PropertyChangeListener modelListener = evt -> {
         if (!"approvalChanged".equals(evt.getPropertyName())) {
             return;
         }
+
         SwingUtilities.invokeLater(() -> {
             ReservationMgmtModel src = (ReservationMgmtModel) evt.getSource();
-            String newStatus = String.valueOf(evt.getNewValue());
-            String oldStatus = String.valueOf(evt.getOldValue());
-            updateReservationRowFromModel(src.getStudentId(), newStatus, oldStatus);
+            updateReservationRowFromModel(src.getStudentId(),
+                    String.valueOf(evt.getNewValue()),
+                    String.valueOf(evt.getOldValue()));
         });
     };
 
-    public ReservationMgmtView() {
+    public ReservationMgmtView(BufferedReader in, BufferedWriter out, String userId) {
+        this.in = in;
+        this.out = out;
+
+        if (in != null && out != null) {
+            this.controller = new ReservationMgmtController(in, out);
+        } else {
+            this.controller = new ReservationMgmtController();
+        }
+
         initComponents();
         setupTableListener();
         setupApprovalColumnEditor();
         loadReservationData();
-        setTitle("관리자 예약 목록");
-        setLocationRelativeTo(null);
-        notificationController.startMonitoring();
+        commonInit();
+    }
 
+// 2. 보조 생성자들 (메인 생성자 호출)
+    public ReservationMgmtView() {
+        this(null, null, null);
     }
 
     public ReservationMgmtView(BufferedReader in, BufferedWriter out) {
-        initComponents();
-        setupTableListener();
-        setupApprovalColumnEditor();
-        loadReservationData();
+        this(in, out, null);
+    }
+
+    public ReservationMgmtView(String userId) {
+        this(null, null, userId);
+    }
+
+    // 공통 초기화
+    private void commonInit() {
         setTitle("관리자 예약 목록");
         setLocationRelativeTo(null);
 
         notificationController.startMonitoring();
-        this.in = in;
-        this.out = out;
-    }
 
-    public ReservationMgmtView(String userId) {
-        initComponents();
-        setLocationRelativeTo(null);
+        autoRefreshTimer = new Timer(3000, e -> loadReservationData());
+        autoRefreshTimer.start();
+
         setVisible(true);
     }
 
@@ -156,10 +173,11 @@ public class ReservationMgmtView extends javax.swing.JFrame {
                 String sid = String.valueOf(model.getValueAt(i, 2));
                 if (studentId.equals(sid)) {
                     model.setValueAt(newStatus, i, 6);
+
                     JOptionPane.showMessageDialog(
                             this,
-                            "학번 " + studentId + " 승인 상태: " + newStatus,
-                            "승인 결과", JOptionPane.INFORMATION_MESSAGE
+                            "학번 " + studentId + " 승인 상태가 " + newStatus + "(으)로 변경되었습니다.",
+                            "승인 변경", JOptionPane.INFORMATION_MESSAGE
                     );
                     break;
                 }
@@ -175,6 +193,10 @@ public class ReservationMgmtView extends javax.swing.JFrame {
             m.removeListener(modelListener);
         }
         currentModels.clear();
+
+        if (autoRefreshTimer != null) {
+            autoRefreshTimer.stop();
+        }
         super.dispose();
     }
 
@@ -204,7 +226,7 @@ public class ReservationMgmtView extends javax.swing.JFrame {
         jButton10 = new javax.swing.JButton();
         jButton11 = new javax.swing.JButton();
         jButton12 = new javax.swing.JButton();
-
+        jButton13 = new javax.swing.JButton();
 
         javax.swing.GroupLayout jFrame1Layout = new javax.swing.GroupLayout(jFrame1.getContentPane());
         jFrame1.getContentPane().setLayout(jFrame1Layout);
@@ -325,6 +347,12 @@ public class ReservationMgmtView extends javax.swing.JFrame {
             }
         });
 
+        jButton13.setText("관리자 취소");
+        jButton13.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton13ActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -335,24 +363,9 @@ public class ReservationMgmtView extends javax.swing.JFrame {
                 .addGap(21, 21, 21)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(layout.createSequentialGroup()
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(layout.createSequentialGroup()
-                                .addGap(12, 12, 12)
-                                .addComponent(jButton4)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(jButton1)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(jButton11)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(jButton2, javax.swing.GroupLayout.PREFERRED_SIZE, 99, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(jButton3, javax.swing.GroupLayout.PREFERRED_SIZE, 99, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                .addComponent(jButton8, javax.swing.GroupLayout.PREFERRED_SIZE, 120, javax.swing.GroupLayout.PREFERRED_SIZE))
-                            .addGroup(layout.createSequentialGroup()
-                                .addComponent(jButton12, javax.swing.GroupLayout.PREFERRED_SIZE, 83, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(165, 165, 165)
-                                .addComponent(jLabel2)))
+                        .addComponent(jButton12, javax.swing.GroupLayout.PREFERRED_SIZE, 83, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(242, 242, 242)
+                        .addComponent(jLabel2)
                         .addContainerGap())
                     .addGroup(layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -372,6 +385,22 @@ public class ReservationMgmtView extends javax.swing.JFrame {
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                 .addComponent(jButton9, javax.swing.GroupLayout.PREFERRED_SIZE, 63, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addContainerGap())))))
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                .addContainerGap(22, Short.MAX_VALUE)
+                .addComponent(jButton4)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(jButton1)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(jButton11)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(jButton2, javax.swing.GroupLayout.PREFERRED_SIZE, 99, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(jButton3, javax.swing.GroupLayout.PREFERRED_SIZE, 99, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(jButton8)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(jButton13)
+                .addGap(17, 17, 17))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -384,7 +413,6 @@ public class ReservationMgmtView extends javax.swing.JFrame {
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jLabel2)
                     .addComponent(jButton12))
-
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jButton6)
@@ -393,15 +421,16 @@ public class ReservationMgmtView extends javax.swing.JFrame {
                     .addComponent(jTextField1))
                 .addGap(12, 12, 12)
                 .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 323, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jButton1)
                     .addComponent(jButton2)
                     .addComponent(jButton3, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(jButton4)
                     .addComponent(jButton8)
-                    .addComponent(jButton11))
-                .addGap(31, 31, 31))
+                    .addComponent(jButton11)
+                    .addComponent(jButton13))
+                .addGap(25, 25, 25))
         );
 
         pack();
@@ -581,12 +610,43 @@ public class ReservationMgmtView extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_jButton12ActionPerformed
 
+    private void jButton13ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton13ActionPerformed
+        int selectedRow = jTable1.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "취소할 예약을 선택하세요.");
+            return;
+        }
+
+        String studentId = jTable1.getValueAt(selectedRow, 2).toString();
+
+        String reason = JOptionPane.showInputDialog(
+                this,
+                "관리자 취소 사유를 입력하세요:",
+                "취소 사유 입력",
+                JOptionPane.PLAIN_MESSAGE
+        );
+
+        if (reason == null || reason.trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "취소 사유를 반드시 입력해야 합니다.");
+            return;
+        }
+
+        // 컨트롤러에서 관리자취소 자동 처리
+        controller.cancelReservationByAdmin(studentId, reason);
+
+        // UI 리프레시
+        loadReservationData();
+
+
+    }//GEN-LAST:event_jButton13ActionPerformed
+
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton jButton1;
     private javax.swing.JButton jButton10;
     private javax.swing.JButton jButton11;
     private javax.swing.JButton jButton12;
+    private javax.swing.JButton jButton13;
     private javax.swing.JButton jButton2;
     private javax.swing.JButton jButton3;
     private javax.swing.JButton jButton4;
