@@ -25,6 +25,9 @@ public class NotificationController {
 
     private Timer timer;
 
+    // 🔥 관리자 취소로 인한 삭제를 무시하기 위한 플래그
+    private boolean adminCancelInProgress = false;
+
     public NotificationController() {
         this.model = new NotificationModel();
     }
@@ -33,12 +36,17 @@ public class NotificationController {
         this.model = model;
     }
 
+    // 🔥 외부에서 관리자 취소를 알릴 때 호출
+    public void notifyAdminCancel() {
+        this.adminCancelInProgress = true;
+    }
+
     public void startMonitoring() {
         timer = new Timer(true);
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                List<String> pendingList = model.getPendingReservations(); // 예약 대기 상태
+                List<String> pendingList = model.getPendingReservations(); // 예약 대기
                 List<String> allList = model.getAllReservations();         // 전체 예약
 
                 Set<String> currentPendingSet = new HashSet<>(pendingList);
@@ -47,44 +55,59 @@ public class NotificationController {
                 List<String> newPendingMessages = new ArrayList<>();
                 List<String> removedReservations = new ArrayList<>();
 
-                // 예약 대기 추가 감지
+                // 1) 신규 예약 대기 감지
                 for (String msg : pendingList) {
                     if (!shownPending.contains(msg)) {
                         newPendingMessages.add(msg);
                     }
                 }
 
-                // 예약 취소 감지
+                // 2) 예약 취소 감지
                 for (String old : shownAll) {
+
+                    if (adminCancelInProgress) {
+                        continue;
+                    }
+
                     String oldName = old.split(",")[0];
+
                     boolean stillExists = currentAllSet.stream()
                             .anyMatch(newLine -> newLine.split(",")[0].equals(oldName));
 
                     if (!stillExists) {
                         removedReservations.add(old);
-
                     }
                 }
 
-                // 상태 갱신
                 shownPending = currentPendingSet;
                 shownAll = currentAllSet;
 
-                // 알림 표시
+                // 3) 팝업 표시
                 if (!newPendingMessages.isEmpty() || !removedReservations.isEmpty()) {
+
+                    boolean shouldShowCancelPopup = !adminCancelInProgress;
+
                     SwingUtilities.invokeLater(() -> {
                         StringBuilder sb = new StringBuilder();
 
                         if (!newPendingMessages.isEmpty()) {
-                            sb.append("📌 새로운 예약 대기 ").append(newPendingMessages.size()).append("건\n");
+                            sb.append("새로운 예약 대기 ").append(newPendingMessages.size()).append("건\n");
                         }
 
-                        for (String removed : removedReservations) {
-                            String name = removed.split(",")[0];
-                            sb.append("❌ ").append(name).append("님의 예약이 취소되었습니다.\n");
+                        if (shouldShowCancelPopup) {
+                            for (String removed : removedReservations) {
+                                String name = removed.split(",")[0];
+                                sb.append("X ").append(name).append("님의 예약이 취소되었습니다.\n");
+                            }
                         }
 
-                        JOptionPane.showMessageDialog(null, sb.toString(), "알림", JOptionPane.INFORMATION_MESSAGE);
+                        // 표시할 메시지가 있을 때만 팝업
+                        if (sb.length() > 0) {
+                            JOptionPane.showMessageDialog(null, sb.toString(), "알림", JOptionPane.INFORMATION_MESSAGE);
+                        }
+
+                        // 관리자 취소 플래그 초기화
+                        adminCancelInProgress = false;
                     });
                 }
             }
@@ -119,7 +142,7 @@ public class NotificationController {
     }
 
     public Map<String, List<String>> detectNotificationChangesForTest() {
-        List<String> pendingList = model.getPendingReservations(); // 예약 대기 상태
+        List<String> pendingList = model.getPendingReservations(); // 예약 대기
         List<String> allList = model.getAllReservations();         // 전체 예약
 
         Set<String> currentPendingSet = new HashSet<>(pendingList);
@@ -140,7 +163,6 @@ public class NotificationController {
             }
         }
 
-        // 상태 갱신
         shownPending = currentPendingSet;
         shownAll = currentAllSet;
 
