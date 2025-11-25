@@ -4,6 +4,7 @@
  */
 package calendar;
 
+
 /**
  *
  * @author adsd3
@@ -22,6 +23,11 @@ public class DialogController {
         this.view = view;
     }
 
+    /**
+     * 날짜 더블클릭 시 호출되는 진입점.
+     * BlockTypeDialogView에서 사용자의 선택에 따라
+     * 알맞은 BlockStrategy(ConcreteStrategy)를 생성해서 실행한다.
+     */
     public void handleDate(LocalDate date) {
         BlockTypeDialogView blockDlg = new BlockTypeDialogView();
         boolean isFull = service.isFullyBlocked(date.toString());
@@ -29,19 +35,23 @@ public class DialogController {
 
         blockDlg.setHandler(new BlockTypeDialogView.Handler() {
             @Override public void onBlockFull() {
-                service.blockAll(date.toString());
-                view.refresh();
+                BlockStrategy strategy =
+                        new FullBlockStrategy(service, view);   // 전략 선택
+                strategy.handle(date);                         // 전략 실행
                 blockDlg.close();
             }
 
             @Override public void onBlockPartial() {
+                BlockStrategy strategy =
+                        new PartialBlockStrategy(service, view); // 전략 선택
+                strategy.handle(date);                           // 전략 실행
                 blockDlg.close();
-                showRoomType(date);
             }
 
             @Override public void onUnblock() {
-                service.unblock(date.toString());
-                view.refresh();
+                BlockStrategy strategy =
+                        new UnblockStrategy(service, view);    // 전략 선택
+                strategy.handle(date);                         // 전략 실행
                 blockDlg.close();
             }
 
@@ -51,61 +61,5 @@ public class DialogController {
         });
 
         blockDlg.show();
-    }
-
-    private void showRoomType(LocalDate date) {
-        RoomTypeDialogView roomTypeDialog = new RoomTypeDialogView();
-        roomTypeDialog.setHandler(new RoomTypeDialogView.Handler() {
-            @Override public void onSelectLecture() {
-                roomTypeDialog.close();
-                showRoomNumber(date, "강의실");
-            }
-
-            @Override public void onSelectLab() {
-                roomTypeDialog.close();
-                showRoomNumber(date, "실습실");
-            }
-
-            @Override public void onCancel() {
-                roomTypeDialog.close();
-            }
-        });
-
-        roomTypeDialog.show();
-    }
-
-    private void showRoomNumber(LocalDate date, String roomType) {
-        RoomNumberDialogView roomNumberDialog = new RoomNumberDialogView();
-        roomNumberDialog.setHandler(new RoomNumberDialogView.Handler() {
-            @Override public void onSelect(String roomNumber) {
-                roomNumberDialog.close();
-                showTimeSlot(date, roomType, roomNumber);
-            }
-
-            @Override public void onCancel() {
-                roomNumberDialog.close();
-            }
-        });
-
-        roomNumberDialog.show(roomType);
-    }
-
-    private void showTimeSlot(LocalDate date, String roomType, String roomNumber) {
-        List<String> blockedSlots = service.getBlockedTimeSlots(date.toString(), roomType, roomNumber);
-
-        TimeSlotDialogView timeSlotDialog = new TimeSlotDialogView(blockedSlots);
-        timeSlotDialog.setHandler(new TimeSlotDialogView.Handler() {
-            @Override public void onSelect(String timeSlot) {
-                service.blockPartial(date.toString(), roomType, roomNumber, timeSlot);
-                view.refresh();
-                timeSlotDialog.close();
-            }
-
-            @Override public void onCancel() {
-                timeSlotDialog.close();
-            }
-        });
-
-        timeSlotDialog.show();
     }
 }
