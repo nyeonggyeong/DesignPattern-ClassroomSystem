@@ -59,6 +59,7 @@ public class LoginController {
     private void setupListeners() {
         view.getLoginButton().addActionListener(e -> attemptLogin());
         view.getRegisterButton().addActionListener(e -> handleSignup());
+        view.getFindPasswordButton().addActionListener(e -> findPassword());
     }
 
     private void attemptLogin() {
@@ -160,6 +161,11 @@ public class LoginController {
             
             
         }
+    }
+    
+    public void findPassword() {
+        view.dispose();
+        FindPasswordController fpc = new FindPasswordController(socket, out, in, view);
     }
     
     private void pollingNotification() {
