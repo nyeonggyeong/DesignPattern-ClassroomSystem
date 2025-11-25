@@ -27,20 +27,23 @@ public class ReservationMgmtController {
     private static final String BAN_LIST_FILE = "src/main/resources/banlist.txt";
     private static final String ALL_FILES_DIR = "src/main/resources/";
     private static final String APPROVAL_NOTIFY_FILE = "src/main/resources/approval_notify.txt";
+    private ReservationMgmtDataModel dataModel;
     private BufferedWriter out;
     private BufferedReader in;
 
-    public static final String EVT_RESERVATIONS = "reservations";
-
-    private final PropertyChangeSupport pcs = new PropertyChangeSupport(this);
     private final java.util.Map<String, ReservationMgmtModel> modelCache = new java.util.HashMap<>();
 
     public ReservationMgmtController() {
     }
 
-    public ReservationMgmtController(BufferedReader in, BufferedWriter out) {
+    public ReservationMgmtController(ReservationMgmtDataModel dataModel) {
+        this.dataModel = dataModel;
+    }
+
+    public ReservationMgmtController(BufferedReader in, BufferedWriter out, ReservationMgmtDataModel dataModel) {
         this.in = in;
         this.out = out;
+        this.dataModel = dataModel;
     }
 
     public void saveAllFiles() {
@@ -57,15 +60,8 @@ public class ReservationMgmtController {
         }
     }
 
-    public void addListener(PropertyChangeListener l) {
-        pcs.addPropertyChangeListener(l);
-    }
-
-    public void removeListener(PropertyChangeListener l) {
-        pcs.removePropertyChangeListener(l);
-    }
-
-    public List<ReservationMgmtModel> getAllReservations() {
+    public void loadReservationsFromFile() { // 메서드 이름 변경 권장 (getAllReservations -> loadReservationsFromFile)
+        // * 기존 getAllReservations 로직과 동일하지만 리턴하지 않고 dataModel에 set 함
         List<ReservationMgmtModel> reservations = new ArrayList<>();
 
         try (BufferedReader reader = new BufferedReader(
@@ -108,6 +104,7 @@ public class ReservationMgmtController {
                     modelCache.put(studentId, model);
 
                 } else {
+                    // 캐시된 모델 상태 동기화
                     if (!model.getApproved().equals(approved)) {
                         if (approved.equals("승인")) {
                             model.approve();
@@ -127,7 +124,10 @@ public class ReservationMgmtController {
             e.printStackTrace();
         }
 
-        return reservations;
+        // [중요] 데이터를 모델에 넣어줌 -> 여기서 notifyObservers()가 발생하여 View가 갱신됨
+        if (dataModel != null) {
+            dataModel.setReservations(reservations);
+        }
     }
 
     public void updateApprovalStatus(String studentId, String newStatus) {
@@ -165,23 +165,17 @@ public class ReservationMgmtController {
         }
 
         if (found) {
+            // [중요] 메모리 상의 모델 업데이트 -> 옵저버 알림 발생
+            if (dataModel != null) {
+                dataModel.updateApprovalInMemory(studentId, newStatus);
+            }
+
+            // 알림 파일 기록
             ReservationMgmtModel model = modelCache.get(studentId);
-
             if (model != null) {
-                if (newStatus.equals("승인")) {
-                    model.approve();
+                if (newStatus.equals("승인") || newStatus.equals("거절")) {
                     appendApprovalNotification(model);
-                } else if (newStatus.equals("거절")) {
-                    model.reject();
-                    appendApprovalNotification(model);
-
-                } else if (newStatus.equals("관리자취소")) {
-                    model.cancelByAdmin();
-                } else {
-                    model.setPending();
                 }
-            } else {
-                getAllReservations();
             }
         }
     }
@@ -228,7 +222,6 @@ public class ReservationMgmtController {
         if (!bannedUsers.contains(studentId)) {
             bannedUsers.add(studentId);
             saveBannedUsers(bannedUsers);
-            pcs.firePropertyChange(EVT_RESERVATIONS, null, null);
         }
     }
 
@@ -239,7 +232,6 @@ public class ReservationMgmtController {
         }
         bannedUsers.remove(studentId);
         saveBannedUsers(bannedUsers);
-        pcs.firePropertyChange(EVT_RESERVATIONS, null, null);
     }
 
     private void saveBannedUsers(List<String> bannedUsers) {
@@ -260,26 +252,10 @@ public class ReservationMgmtController {
     }
 
     public List<ReservationMgmtModel> searchReservations(String name, String studentId, String room) {
-        List<ReservationMgmtModel> allReservations = getAllReservations();
-        List<ReservationMgmtModel> filtered = new ArrayList<>();
-
-        for (ReservationMgmtModel r : allReservations) {
-            boolean match = true;
-
-            if (name != null && !name.isEmpty() && !r.getName().contains(name)) {
-                match = false;
-            }
-            if (studentId != null && !studentId.isEmpty() && !r.getStudentId().contains(studentId)) {
-                match = false;
-            }
-            if (room != null && !room.isEmpty() && !r.getRoom().contains(room)) {
-                match = false;
-            }
-            if (match) {
-                filtered.add(r);
-            }
+        if (dataModel != null) {
+            return dataModel.searchReservations(name, studentId, room);
         }
-        return filtered;
+        return new ArrayList<>();
     }
 
     public boolean cancelReservationByAdmin(String studentId, String reason) {
@@ -347,9 +323,13 @@ public class ReservationMgmtController {
         if (model != null) {
             model.cancelByAdmin();
         } else {
-            getAllReservations();
+            loadReservationsFromFile(); // 메서드 이름 변경됨
         }
-        pcs.firePropertyChange(EVT_RESERVATIONS, null, null);
+
+        // [중요] 강제 갱신 (옵저버 알림)
+        if (dataModel != null) {
+            dataModel.updateApprovalInMemory(studentId, "관리자취소");
+        }
 
         return true;
     }

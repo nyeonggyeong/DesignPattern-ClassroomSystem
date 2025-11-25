@@ -6,11 +6,12 @@ package management;
 
 import java.util.ArrayList;
 import java.util.List;
+
 /**
  *
  * @author suk22
  */
-public class ReservationMgmtDataModel {
+public class ReservationMgmtDataModel extends ReservationMgmtSubject {
 
     private List<ReservationMgmtModel> reservations;
 
@@ -18,15 +19,15 @@ public class ReservationMgmtDataModel {
         reservations = new ArrayList<>();
     }
 
-    public void addReservation(ReservationMgmtModel r) {
-        reservations.add(r);
+    public void setReservations(List<ReservationMgmtModel> newList) {
+        this.reservations = newList != null ? newList : new ArrayList<>();
+        notifyObservers(); // 상태 변경 알림
     }
 
-    public List<ReservationMgmtModel> getAllReservations() {
+    public List<ReservationMgmtModel> getReservations() {
         return reservations;
     }
 
-    // 이름, 학번, 강의실로 필터 검색
     public List<ReservationMgmtModel> searchReservations(String name, String studentId, String room) {
         List<ReservationMgmtModel> result = new ArrayList<>();
 
@@ -49,5 +50,25 @@ public class ReservationMgmtDataModel {
         }
 
         return result;
+    }
+
+    // 승인 상태 업데이트
+    public void updateApprovalInMemory(String studentId, String newStatus) {
+        for (ReservationMgmtModel r : reservations) {
+            if (r.getStudentId().equals(studentId)) {
+
+                if ("승인".equals(newStatus)) {
+                    r.approve();
+                } else if ("거절".equals(newStatus)) {
+                    r.reject();
+                } else if ("관리자취소".equals(newStatus)) {
+                    r.cancelByAdmin();
+                } else {
+                    r.setPending();
+                }
+                break;
+            }
+        }
+        notifyObservers();
     }
 }
