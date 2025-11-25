@@ -113,7 +113,7 @@ public class ReservationMgmtController {
                         } else if (approved.equals("거절")) {
                             model.reject();
                         } else if (approved.equals("관리자취소")) {
-                            model.cancelByAdmin();  
+                            model.cancelByAdmin();
                         } else {
                             model.setPending();
                         }
@@ -178,7 +178,7 @@ public class ReservationMgmtController {
                     appendApprovalNotification(model);
 
                 } else if (newStatus.equals("관리자취소")) {
-                    model.cancelByAdmin(); 
+                    model.cancelByAdmin();
                 } else {
                     model.setPending();
                 }
@@ -287,18 +287,79 @@ public class ReservationMgmtController {
         return filtered;
     }
 
-    public void cancelReservationByAdmin(String studentId, String reason) {
+    public boolean cancelReservationByAdmin(String studentId, String reason) {
 
-        updateApprovalStatus(studentId, "관리자취소");
+        List<String> updatedLines = new ArrayList<>();
+        List<String> removedLines = new ArrayList<>();
 
-        String line = String.join(",", studentId, "관리자취소", reason);
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(FILE_PATH), StandardCharsets.UTF_8))) {
 
-        try (BufferedWriter writer = new BufferedWriter(
-                new OutputStreamWriter(new FileOutputStream("src/main/resources/cancel_notify.txt", true), StandardCharsets.UTF_8))) {
-            writer.write(line);
-            writer.newLine();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] data = line.split(",");
+
+                if (data.length >= 13 && data[2].equals(studentId)) {
+                    removedLines.add(line); // 삭제 목록 저장
+                    continue;
+                }
+                updatedLines.add(line);
+            }
+
         } catch (IOException e) {
             e.printStackTrace();
+            return false;
         }
+
+        // 파일 다시 쓰기
+        try (BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(FILE_PATH, false), StandardCharsets.UTF_8))) {
+
+            for (String updatedLine : updatedLines) {
+                writer.write(updatedLine);
+                writer.newLine();
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+
+        // 취소된 예약 저장
+        try (BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream("src/main/resources/cancelled_reservations.txt", true),
+                        StandardCharsets.UTF_8))) {
+
+            for (String removed : removedLines) {
+                writer.write(removed + ",관리자취소," + reason);
+                writer.newLine();
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+
+        // 알림 파일 기록
+        try (BufferedWriter writer = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream("src/main/resources/cancel_notify.txt", true),
+                        StandardCharsets.UTF_8))) {
+
+            String line = studentId + ",관리자취소," + reason;
+            writer.write(line);
+            writer.newLine();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+
+        ReservationMgmtModel model = modelCache.get(studentId);
+        if (model != null) {
+            model.cancelByAdmin();
+        }
+
+        return true; // 성공!
     }
+
 }
