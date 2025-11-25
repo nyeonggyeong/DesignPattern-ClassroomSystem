@@ -4,11 +4,13 @@
  */
 package management;
 
+import management.iterator.*;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
 
 public class CanceledReservationView extends JFrame {
 
@@ -19,7 +21,6 @@ public class CanceledReservationView extends JFrame {
         setSize(900, 400);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
-        setLayout(new BorderLayout());
 
         initUI();
         setVisible(true);
@@ -27,81 +28,55 @@ public class CanceledReservationView extends JFrame {
 
     private void initUI() {
 
-        String[] columnNames = {
-            "이름", "학과", "학번",
-            "강의실", "날짜", "시간",
-            "상태", "취소 사유"
+        String[] cols = {
+            "이름", "학과", "학번", "강의실",
+            "날짜", "시간", "상태", "취소 사유"
         };
 
-        table = new JTable(new DefaultTableModel(columnNames, 0));
-        JScrollPane scrollPane = new JScrollPane(table);
+        table = new JTable(new DefaultTableModel(cols, 0));
+        add(new JScrollPane(table), BorderLayout.CENTER);
 
-        add(scrollPane, BorderLayout.CENTER);
+        JButton closeBtn = new JButton("닫기");
+        closeBtn.addActionListener(e -> dispose());
+        JPanel p = new JPanel();
+        p.add(closeBtn);
+        add(p, BorderLayout.SOUTH);
 
-        JPanel bottomPanel = new JPanel();
-        JButton closeButton = new JButton("닫기");
-
-        closeButton.addActionListener(e -> dispose());
-
-        bottomPanel.add(closeButton);
-        add(bottomPanel, BorderLayout.SOUTH);
-
-        loadCanceledData();
+       loadCanceledData();
     }
 
     private void loadCanceledData() {
 
-        File file = new File("src/main/resources/cancelled_reservations.txt");
-        if (!file.exists()) {
-            JOptionPane.showMessageDialog(this, "취소된 예약이 없습니다.");
-            return;
-        }
+        ReservationCollection canceled
+                = new ReservationCollection("src/main/resources/cancelled_reservations.txt");
+
+        Iterator<Reservation> it = canceled.createIterator();
 
         DefaultTableModel model = (DefaultTableModel) table.getModel();
         model.setRowCount(0);
 
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
+        while (it.hasNext()) {
+            Reservation r = it.next();
+            String[] data = r.getRawLine().split(",");
 
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String[] data = line.split(",");
-
-                if (data.length < 15) {
-                    System.out.println("데이터가 부족한 라인 무시: " + line);
-                    continue;
-                }
-
-                String name = data[0];
-                String userType = data[1];
-                String studentId = data[2];
-                String department = data[3];
-                String building = data[4];
-                String roomType = data[5];
-                String roomNumber = data[6];
-                String date = data[7];
-                String day = data[8];
-                String startTime = data[9];
-                String endTime = data[10];
-                String purpose = data[11];
-                String approved = data[12];
-
-                String cancelStatus = data[13];
-                String reason = data[14];
-
-                String displayName = name + "(" + userType + ")";
-                String roomDisplay = building + " / " + roomNumber;
-                String timeDisplay = startTime + " ~ " + endTime;
-
-                model.addRow(new Object[]{
-                    displayName, department, studentId,
-                    roomDisplay, date, timeDisplay,
-                    cancelStatus, reason
-                });
+            if (data.length < 15) {
+                continue;
             }
 
-        } catch (IOException e) {
-            e.printStackTrace();
+            String displayName = data[0] + "(" + data[1] + ")";
+            String roomDisplay = data[4] + " / " + data[6];
+            String timeDisplay = data[9] + " ~ " + data[10];
+
+            model.addRow(new Object[]{
+                displayName,
+                data[3],
+                data[2],
+                roomDisplay,
+                data[7],
+                timeDisplay,
+                data[13],
+                data[14]
+            });
         }
     }
 }

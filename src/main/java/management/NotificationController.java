@@ -25,7 +25,6 @@ public class NotificationController {
 
     private Timer timer;
 
-    // 🔥 관리자 취소로 인한 삭제를 무시하기 위한 플래그
     private boolean adminCancelInProgress = false;
 
     public NotificationController() {
@@ -36,7 +35,6 @@ public class NotificationController {
         this.model = model;
     }
 
-    // 🔥 외부에서 관리자 취소를 알릴 때 호출
     public void notifyAdminCancel() {
         this.adminCancelInProgress = true;
     }
@@ -55,14 +53,12 @@ public class NotificationController {
                 List<String> newPendingMessages = new ArrayList<>();
                 List<String> removedReservations = new ArrayList<>();
 
-                // 1) 신규 예약 대기 감지
                 for (String msg : pendingList) {
                     if (!shownPending.contains(msg)) {
                         newPendingMessages.add(msg);
                     }
                 }
 
-                // 2) 예약 취소 감지
                 for (String old : shownAll) {
 
                     if (adminCancelInProgress) {
@@ -82,7 +78,6 @@ public class NotificationController {
                 shownPending = currentPendingSet;
                 shownAll = currentAllSet;
 
-                // 3) 팝업 표시
                 if (!newPendingMessages.isEmpty() || !removedReservations.isEmpty()) {
 
                     boolean shouldShowCancelPopup = !adminCancelInProgress;
@@ -114,7 +109,6 @@ public class NotificationController {
         }, 0, 5_000);
     }
 
-    // 예약 상태 즉시 갱신용 공개 메서드
     public void refreshNotifications() {
         List<String> pendingList = model.getPendingReservations();
         shownPending = new HashSet<>(pendingList); // 상태만 초기화

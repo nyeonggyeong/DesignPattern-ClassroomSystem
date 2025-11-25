@@ -10,6 +10,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.io.*;
+import management.iterator.*;
 import java.util.List;
 import javax.swing.JOptionPane;
 import java.beans.PropertyChangeListener;
@@ -119,7 +120,6 @@ public class ReservationMgmtController {
                         }
                     }
                 }
-
                 reservations.add(model);
             }
 
@@ -168,11 +168,9 @@ public class ReservationMgmtController {
             ReservationMgmtModel model = modelCache.get(studentId);
 
             if (model != null) {
-
                 if (newStatus.equals("승인")) {
                     model.approve();
                     appendApprovalNotification(model);
-
                 } else if (newStatus.equals("거절")) {
                     model.reject();
                     appendApprovalNotification(model);
@@ -237,7 +235,6 @@ public class ReservationMgmtController {
     public void unbanUser(String studentId) {
         List<String> bannedUsers = getBannedUsers();
         if (!bannedUsers.contains(studentId)) {
-            // 팝업은 View에서 띄우도록 유지
             return;
         }
         bannedUsers.remove(studentId);
@@ -278,88 +275,82 @@ public class ReservationMgmtController {
             if (room != null && !room.isEmpty() && !r.getRoom().contains(room)) {
                 match = false;
             }
-
             if (match) {
                 filtered.add(r);
             }
         }
-
         return filtered;
     }
 
     public boolean cancelReservationByAdmin(String studentId, String reason) {
+        // 1. Iterator 패턴을 사용하여 데이터 순회 및 분리
+        ReservationCollection collection = new ReservationCollection(FILE_PATH);
+        Iterator<Reservation> it = collection.createIterator();
 
-        List<String> updatedLines = new ArrayList<>();
-        List<String> removedLines = new ArrayList<>();
+        List<String> updated = new ArrayList<>();
+        List<String> removed = new ArrayList<>();
+        boolean isCancelled = false; // 실제로 취소가 발생했는지 확인
 
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(new FileInputStream(FILE_PATH), StandardCharsets.UTF_8))) {
-
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String[] data = line.split(",");
-
-                if (data.length >= 13 && data[2].equals(studentId)) {
-                    removedLines.add(line); // 삭제 목록 저장
-                    continue;
-                }
-                updatedLines.add(line);
+        while (it.hasNext()) {
+            Reservation r = it.next();
+            if (r.getRawLine() == null || r.getRawLine().trim().isEmpty()) {
+                continue;
             }
 
-        } catch (IOException e) {
-            e.printStackTrace();
-            return false;
+            try {
+                if (r.getStudentId().equals(studentId)) {
+                    removed.add(r.getRawLine());
+                    isCancelled = true;
+                } else {
+                    updated.add(r.getRawLine());
+                }
+            } catch (ArrayIndexOutOfBoundsException e) {
+                updated.add(r.getRawLine());
+                System.out.println("잘못된 데이터 형식 발견: " + r.getRawLine());
+            }
         }
 
-        // 파일 다시 쓰기
+        if (!isCancelled) {
+            System.out.println("취소 대상 학생을 찾지 못했습니다: " + studentId);
+            return false; // 해당 학생의 예약이 없어 취소하지 못함
+        }
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(new FileOutputStream(FILE_PATH, false), StandardCharsets.UTF_8))) {
-
-            for (String updatedLine : updatedLines) {
-                writer.write(updatedLine);
+            for (String line : updated) {
+                writer.write(line);
                 writer.newLine();
             }
-
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
         }
 
-        // 취소된 예약 저장
         try (BufferedWriter writer = new BufferedWriter(
-                new OutputStreamWriter(new FileOutputStream("src/main/resources/cancelled_reservations.txt", true),
-                        StandardCharsets.UTF_8))) {
-
-            for (String removed : removedLines) {
-                writer.write(removed + ",관리자취소," + reason);
+                new OutputStreamWriter(new FileOutputStream("src/main/resources/cancelled_reservations.txt", true), StandardCharsets.UTF_8))) {
+            for (String line : removed) {
+                writer.write(line + ",관리자 취소," + reason);
                 writer.newLine();
             }
-
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
         }
 
-        // 알림 파일 기록
         try (BufferedWriter writer = new BufferedWriter(
-                new OutputStreamWriter(new FileOutputStream("src/main/resources/cancel_notify.txt", true),
-                        StandardCharsets.UTF_8))) {
-
-            String line = studentId + ",관리자취소," + reason;
-            writer.write(line);
+                new OutputStreamWriter(new FileOutputStream("src/main/resources/cancel_notify.txt", true), StandardCharsets.UTF_8))) {
+            writer.write(studentId + ",관리자 취소," + reason);
             writer.newLine();
-
-        } catch (IOException e) {
-            e.printStackTrace();
-            return false;
+        } catch (Exception ignored) {
         }
 
         ReservationMgmtModel model = modelCache.get(studentId);
         if (model != null) {
             model.cancelByAdmin();
+        } else {
+            getAllReservations();
         }
+        pcs.firePropertyChange(EVT_RESERVATIONS, null, null);
 
-        return true; // 성공!
+        return true;
     }
-
 }
