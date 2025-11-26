@@ -22,8 +22,18 @@ public class ReservationIterator implements Iterator<Reservation> {
                     new InputStreamReader(new FileInputStream(filePath), StandardCharsets.UTF_8)
             );
             nextLine = reader.readLine();
+
+            if (nextLine == null) {
+                reader.close();
+            }
         } catch (Exception e) {
             nextLine = null;
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (Exception ignored) {
+                }
+            }
         }
     }
 
