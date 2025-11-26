@@ -40,6 +40,7 @@ public class ReservationMgmtView extends javax.swing.JFrame implements Reservati
     private ReservationMgmtDataModel dataModel;
     private boolean suppressTableListener = false;
     private boolean isApplyingApproval = false;
+    private Timer autoRefreshTimer;
     private BufferedReader in;
     private BufferedWriter out;
 
@@ -64,9 +65,9 @@ public class ReservationMgmtView extends javax.swing.JFrame implements Reservati
         initComponents();
         setupTableListener();
         setupApprovalColumnEditor();
-        
-        controller.loadReservationsFromFile();
 
+        controller.loadReservationsFromFile();
+        startAutoRefresh();
         commonInit();
     }
 
@@ -133,47 +134,54 @@ public class ReservationMgmtView extends javax.swing.JFrame implements Reservati
     private void setupTableListener() {
         jTable1.getModel().addTableModelListener(e -> {
 
-        if (suppressTableListener) {
-            return;
-        }
-        if (isApplyingApproval) {
-            return;
-        }
-
-        int row = e.getFirstRow();
-        int col = e.getColumn();
-
-        if (row < 0 || col != 6) {
-            return; // 승인 여부 컬럼만 처리
-        }
-        String studentId = String.valueOf(jTable1.getValueAt(row, 2));
-        String newStatus = String.valueOf(jTable1.getValueAt(row, 6));
-
-        try {
-            isApplyingApproval = true;
-            
-            controller.updateApprovalStatus(studentId, newStatus);
-
-            if ("승인".equals(newStatus)) {
-                JOptionPane.showMessageDialog(this, 
-                    "예약이 승인되었습니다.", "처리 완료", JOptionPane.INFORMATION_MESSAGE);
-            } else if ("거절".equals(newStatus)) {
-                JOptionPane.showMessageDialog(this, 
-                    "예약이 거절되었습니다.", "처리 완료", JOptionPane.INFORMATION_MESSAGE);
-            } else if ("관리자취소".equals(newStatus)) {
-                JOptionPane.showMessageDialog(this, 
-                    "예약이 관리자 권한으로 취소되었습니다.", "처리 완료", JOptionPane.INFORMATION_MESSAGE);
+            if (suppressTableListener) {
+                return;
+            }
+            if (isApplyingApproval) {
+                return;
             }
 
-        } finally {
-            isApplyingApproval = false;
-        }
-    });
+            int row = e.getFirstRow();
+            int col = e.getColumn();
+
+            if (row < 0 || col != 6) {
+                return; // 승인 여부 컬럼만 처리
+            }
+            String studentId = String.valueOf(jTable1.getValueAt(row, 2));
+            String newStatus = String.valueOf(jTable1.getValueAt(row, 6));
+
+            try {
+                isApplyingApproval = true;
+
+                controller.updateApprovalStatus(studentId, newStatus);
+
+                if ("승인".equals(newStatus)) {
+                    JOptionPane.showMessageDialog(this,
+                            "예약이 승인되었습니다.", "처리 완료", JOptionPane.INFORMATION_MESSAGE);
+                } else if ("거절".equals(newStatus)) {
+                    JOptionPane.showMessageDialog(this,
+                            "예약이 거절되었습니다.", "처리 완료", JOptionPane.INFORMATION_MESSAGE);
+                } else if ("관리자취소".equals(newStatus)) {
+                    JOptionPane.showMessageDialog(this,
+                            "예약이 관리자 권한으로 취소되었습니다.", "처리 완료", JOptionPane.INFORMATION_MESSAGE);
+                }
+
+            } finally {
+                isApplyingApproval = false;
+            }
+        });
     }
 
+    private void startAutoRefresh() {
+        autoRefreshTimer = new Timer(3000, e -> controller.loadReservationsFromFile());
+        autoRefreshTimer.start();
+    }
 
     @Override
     public void dispose() {
+        if (autoRefreshTimer != null) {
+            autoRefreshTimer.stop();
+        }
         super.dispose();
     }
 

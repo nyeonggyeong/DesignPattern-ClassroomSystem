@@ -134,7 +134,6 @@ public class ReservationMgmtController {
         List<String> updatedLines = new ArrayList<>();
         boolean found = false;
 
-        // [KEEP] 파일 읽기/라인 업데이트
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(new FileInputStream(FILE_PATH), StandardCharsets.UTF_8))) {
 
@@ -153,7 +152,6 @@ public class ReservationMgmtController {
             e.printStackTrace();
         }
 
-        // [KEEP] 파일 쓰기
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(new FileOutputStream(FILE_PATH, false), StandardCharsets.UTF_8))) {
             for (String updatedLine : updatedLines) {
@@ -165,12 +163,10 @@ public class ReservationMgmtController {
         }
 
         if (found) {
-            // [중요] 메모리 상의 모델 업데이트 -> 옵저버 알림 발생
             if (dataModel != null) {
                 dataModel.updateApprovalInMemory(studentId, newStatus);
             }
 
-            // 알림 파일 기록
             ReservationMgmtModel model = modelCache.get(studentId);
             if (model != null) {
                 if (newStatus.equals("승인") || newStatus.equals("거절")) {
@@ -222,6 +218,8 @@ public class ReservationMgmtController {
         if (!bannedUsers.contains(studentId)) {
             bannedUsers.add(studentId);
             saveBannedUsers(bannedUsers);
+
+            loadReservationsFromFile();
         }
     }
 
@@ -232,6 +230,8 @@ public class ReservationMgmtController {
         }
         bannedUsers.remove(studentId);
         saveBannedUsers(bannedUsers);
+
+        loadReservationsFromFile();
     }
 
     private void saveBannedUsers(List<String> bannedUsers) {
@@ -259,13 +259,12 @@ public class ReservationMgmtController {
     }
 
     public boolean cancelReservationByAdmin(String studentId, String reason) {
-        // 1. Iterator 패턴을 사용하여 데이터 순회 및 분리
         ReservationCollection collection = new ReservationCollection(FILE_PATH);
         Iterator<Reservation> it = collection.createIterator();
 
         List<String> updated = new ArrayList<>();
         List<String> removed = new ArrayList<>();
-        boolean isCancelled = false; // 실제로 취소가 발생했는지 확인
+        boolean isCancelled = false;
 
         while (it.hasNext()) {
             Reservation r = it.next();
@@ -288,8 +287,9 @@ public class ReservationMgmtController {
 
         if (!isCancelled) {
             System.out.println("취소 대상 학생을 찾지 못했습니다: " + studentId);
-            return false; // 해당 학생의 예약이 없어 취소하지 못함
+            return false;
         }
+
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(new FileOutputStream(FILE_PATH, false), StandardCharsets.UTF_8))) {
             for (String line : updated) {
@@ -319,17 +319,7 @@ public class ReservationMgmtController {
         } catch (Exception ignored) {
         }
 
-        ReservationMgmtModel model = modelCache.get(studentId);
-        if (model != null) {
-            model.cancelByAdmin();
-        } else {
-            loadReservationsFromFile(); // 메서드 이름 변경됨
-        }
-
-        // [중요] 강제 갱신 (옵저버 알림)
-        if (dataModel != null) {
-            dataModel.updateApprovalInMemory(studentId, "관리자취소");
-        }
+        loadReservationsFromFile();
 
         return true;
     }
