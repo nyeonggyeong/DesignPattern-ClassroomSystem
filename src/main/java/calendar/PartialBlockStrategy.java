@@ -29,7 +29,7 @@ public class PartialBlockStrategy implements BlockStrategy {
     /**
      * 강의실/실습실 선택 다이얼로그
      */
-    private void showRoomType(LocalDate date) {
+    protected void showRoomType(LocalDate date) {
         RoomTypeDialogView roomTypeDialog = new RoomTypeDialogView();
         roomTypeDialog.setHandler(new RoomTypeDialogView.Handler() {
             @Override

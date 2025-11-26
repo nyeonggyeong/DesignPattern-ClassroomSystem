@@ -42,7 +42,6 @@ public class ReservationMgmtView extends javax.swing.JFrame implements Reservati
     private boolean isApplyingApproval = false;
     private BufferedReader in;
     private BufferedWriter out;
-    private Timer autoRefreshTimer;   // 자동 새로고침 타이머
 
     // 메인 생성자
     public ReservationMgmtView(BufferedReader in, BufferedWriter out, String userId) {
@@ -65,12 +64,9 @@ public class ReservationMgmtView extends javax.swing.JFrame implements Reservati
         initComponents();
         setupTableListener();
         setupApprovalColumnEditor();
-
-        // 최초 데이터 로딩
+        
         controller.loadReservationsFromFile();
 
-        // 자동 새로고침, 화면 공통 설정
-        startAutoRefresh();
         commonInit();
     }
 
@@ -175,16 +171,9 @@ public class ReservationMgmtView extends javax.swing.JFrame implements Reservati
     });
     }
 
-    private void startAutoRefresh() {
-        autoRefreshTimer = new Timer(3000, e -> controller.loadReservationsFromFile());
-        autoRefreshTimer.start();
-    }
 
     @Override
     public void dispose() {
-        if (autoRefreshTimer != null) {
-            autoRefreshTimer.stop();
-        }
         super.dispose();
     }
 
@@ -500,23 +489,20 @@ public class ReservationMgmtView extends javax.swing.JFrame implements Reservati
         controller.banUser(studentId);
         JOptionPane.showMessageDialog(this, studentId + " 사용자가 제한되었습니다.");
 
-        controller.loadReservationsFromFile();
     }//GEN-LAST:event_jButton6ActionPerformed
 
     private void jButton7ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton7ActionPerformed
         String studentId = JOptionPane.showInputDialog(this, "해제할 사용자의 학번을 입력하세요.");
         if (studentId != null && !studentId.isEmpty()) {
             controller.unbanUser(studentId);
-
-            controller.loadReservationsFromFile();
-
         }
     }//GEN-LAST:event_jButton7ActionPerformed
 
     private void jButton9ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton9ActionPerformed
         String keyword = jTextField1.getText().trim();
         if (keyword.isEmpty()) {
-            controller.loadReservationsFromFile();
+            List<ReservationMgmtModel> all = dataModel.getReservations();
+            refreshTable(all);
             return;
         }
 
@@ -669,8 +655,6 @@ public class ReservationMgmtView extends javax.swing.JFrame implements Reservati
             JOptionPane.showMessageDialog(this, "관리자 취소 처리 중 오류가 발생했습니다.");
         }
 
-        // 화면 새로고침
-        controller.loadReservationsFromFile();
     }//GEN-LAST:event_jButton13ActionPerformed
 
     private void jButton14ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton14ActionPerformed
