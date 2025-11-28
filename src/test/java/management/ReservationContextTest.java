@@ -66,9 +66,6 @@ public class ReservationContextTest {
         assertEquals("승인", ctx.getStatusName());
     }
 
-    // ---------------------------
-    // RejectedState 테스트
-    // ---------------------------
     @Test
     void testRejectedRejectDoesNothing() {
         ReservationContext ctx = new ReservationContext("거절");

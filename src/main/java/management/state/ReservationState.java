@@ -13,3 +13,4 @@ public interface ReservationState {
     void reject(ReservationContext ctx);
     String getStatusName();
 }
+
