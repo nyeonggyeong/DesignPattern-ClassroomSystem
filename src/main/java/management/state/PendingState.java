@@ -25,4 +25,3 @@ public class PendingState implements ReservationState {
         return "예약대기";
     }
 }
-

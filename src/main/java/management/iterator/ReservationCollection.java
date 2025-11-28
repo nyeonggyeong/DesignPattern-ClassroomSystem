@@ -20,5 +20,3 @@ public class ReservationCollection {
         return new ReservationIterator(filePath);
     }
 }
-
-
