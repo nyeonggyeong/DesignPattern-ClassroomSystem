@@ -57,23 +57,18 @@ public class BlockStrategyIntegrationTest {
     @Test
     @DisplayName("PartialBlockStrategy는 UI 흐름 시작(showRoomType)까지는 정상 호출된다")
     void testPartialBlockStrategyStartsUIFlow() {
-        // given
         ReservationServiceModel service = mock(ReservationServiceModel.class);
         CalendarView view = mock(CalendarView.class);
 
         PartialBlockStrategy strategy = Mockito.spy(new PartialBlockStrategy(service, view));
         LocalDate date = LocalDate.of(2025, 1, 12);
 
-        // doNothing()으로 UI 호출 부분은 무시한다.
         doNothing().when(strategy).showRoomType(date);
 
-        // when
         strategy.handle(date);
 
-        // then — UI 진입 함수가 실행되는지 확인
         verify(strategy, times(1)).showRoomType(date);
 
-        // partial block은 실제 partial block 호출 단계까지 가지 않으므로
         verify(service, never()).blockPartial(anyString(), anyString(), anyString(), anyString());
     }
 }

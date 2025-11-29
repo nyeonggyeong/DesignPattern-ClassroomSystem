@@ -30,17 +30,17 @@ public class ReservationIteratorIntegrationTest {
     @Test
     @DisplayName("ReservationCollection이 파일에서 ReservationIterator를 통해 모든 예약 정보를 순회한다")
     void testIntegrationWithReservationCollectionAndIterator() throws IOException {
-        // given: 예약 데이터가 파일에 저장되어 있고
+        // given
         String reservationLine1 = "Kim,Student,2023001,AI,IT,Classroom,101,2023-11-01,Mon,10:00,12:00,Study,Approved";
         String reservationLine2 = "Lee,Student,2023002,DS,Science,Lab,202,2023-11-02,Tue,13:00,15:00,Meeting,Pending";
         Path filePath = tempDir.resolve("test_reservations.txt");
         Files.write(filePath, List.of(reservationLine1, reservationLine2));
 
-        // when: 해당 파일로부터 ReservationCollection을 생성하고 Iterator로 탐색
+        // when
         ReservationCollection collection = new ReservationCollection(filePath.toString());
         Iterator<Reservation> iterator = collection.createIterator();
 
-        // then: 예약 정보가 순차적으로 잘 로드되고 탐색됨
+        // then
         assertTrue(iterator.hasNext(), "첫 번째 예약 존재");
         Reservation r1 = iterator.next();
         assertEquals("Kim", r1.getName());
