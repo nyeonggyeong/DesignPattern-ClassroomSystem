@@ -17,6 +17,10 @@ public class LoginController {
     private Socket socket;
     private BufferedWriter out;
     private BufferedReader in;
+    private String userId;
+    private String role;
+    private Timer pollingTimer;
+    private boolean isWaiting = false;
 
     public LoginController(LoginView view, LoginModel model) {
         this.view = view;
@@ -55,6 +59,7 @@ public class LoginController {
         this.in = tempIn;
 
         setupListeners();
+        startPollingNotification();
     }
 
     private void setupListeners() {
@@ -67,7 +72,10 @@ public class LoginController {
         String userId = view.getUserId();
         String password = view.getPassword();
         String role = view.getRole(); // student / professor / admin
-
+        
+        this.userId = userId;
+        this.role = role;
+        
         try {
             out.write("LOGIN:" + userId + "," + password + "," + role);
             out.newLine();
@@ -75,54 +83,13 @@ public class LoginController {
 
             String response = in.readLine();
 
-            if ("LOGIN_SUCCESS".equals(response)) {
-                JOptionPane.showMessageDialog(view, userId + "님 로그인 성공");
-
-                SocketManager.setSocket(socket);
-                new FileWatcher().start();
-
-                // 서버에 유저 정보 요청
-                out.write("INFO_REQUEST:" + userId + "\n");
-                out.flush();
-
-                String userInfoResponse = in.readLine();
-
-                // ---------------- Adapter 적용 ----------------
-                String userName = "";
-                String userDept = "";
-                String userType = role;
-
-                if (userInfoResponse != null && userInfoResponse.startsWith("INFO_RESPONSE:")) {
-                    String[] parts = userInfoResponse.substring("INFO_RESPONSE:".length()).split(",");
-                    if (parts.length >= 4) {
-                        userName = parts[0];  // 서버에서 보내주는 이름
-                        userDept = parts[2];  // 서버에서 보내주는 학과
-                        userType = parts[3];  // student / professor / admin
-                    }
-                }
-
-                // 1) User 객체 생성
-                IUser user = new UserImpl(userId, userType, userName, userDept);
-
-                // 2) Adapter로 감싸기
-                IUserAdapter adapter = new UserAdapter(user);
-
-                // 3) 공통 메서드 사용 (테스트용)
-                adapter.showInfo();
-                System.out.println("Role: " + adapter.getRole());
-                // ---------------------------------------------
-
-                // DashboardFactory 호출
-                String mainRole = "admin".equalsIgnoreCase(adapter.getRole()) ? "admin" : "user";
-                String subRole = "admin".equalsIgnoreCase(adapter.getRole()) ? null : adapter.getRole();
-
-                Dashboard dashboard = DashboardFactory.createDashboard(mainRole, subRole, userId, socket, out, in);
-                dashboard.show();
-
-                view.dispose();
+            if ("LOGIN_SUCCESS".equals(response)) {                
+                handleLoginSuccess();
 
             } else if ("WAIT".equals(response)) {
                 JOptionPane.showMessageDialog(view, "현재 접속 인원 초과로 대기 중입니다.");
+                isWaiting = true;
+                view.getLoginButton().setEnabled(!isWaiting);
             } else {
                 JOptionPane.showMessageDialog(view, "로그인 실패");
             }
@@ -132,7 +99,55 @@ public class LoginController {
             JOptionPane.showMessageDialog(view, "서버 통신 오류: " + ex.getMessage());
         }
     }
+    
+    private void handleLoginSuccess() throws IOException {
+        JOptionPane.showMessageDialog(view, userId + "님 로그인 성공");
 
+        SocketManager.setSocket(socket);
+        new FileWatcher().start();
+
+        // 서버에 유저 정보 요청
+        out.write("INFO_REQUEST:" + userId + "\n");
+        out.flush();
+
+        String userInfoResponse = in.readLine();
+
+        // ---------------- Adapter 적용 ----------------
+        String userName = "";
+        String userDept = "";
+        String userType = role;
+
+        if (userInfoResponse != null && userInfoResponse.startsWith("INFO_RESPONSE:")) {
+            String[] parts = userInfoResponse.substring("INFO_RESPONSE:".length()).split(",");
+            if (parts.length >= 4) {
+                userName = parts[0];  // 서버에서 보내주는 이름
+                userDept = parts[2];  // 서버에서 보내주는 학과
+                userType = parts[3];  // student / professor / admin
+            }
+        }
+
+        // 1) User 객체 생성
+        IUser user = new UserImpl(userId, userType, userName, userDept);
+
+        // 2) Adapter로 감싸기
+        IUserAdapter adapter = new UserAdapter(user);
+
+        // 3) 공통 메서드 사용 (테스트용)
+        adapter.showInfo();
+        System.out.println("Role: " + adapter.getRole());
+        // ---------------------------------------------
+
+        // DashboardFactory 호출
+        String mainRole = "admin".equalsIgnoreCase(adapter.getRole()) ? "admin" : "user";
+        String subRole = "admin".equalsIgnoreCase(adapter.getRole()) ? null : adapter.getRole();
+
+        Dashboard dashboard = DashboardFactory.createDashboard(mainRole, subRole, userId, socket, out, in);
+        dashboard.show();
+        
+        stopPollingNotification();
+        view.dispose();
+    }
+    
     public void handleSignup() {
         view.dispose();
         SignupView signupView = new SignupView();
@@ -141,13 +156,23 @@ public class LoginController {
         signupView.setVisible(true);
     }
 
-    public void checkCancelNotification() {
+    public void checkNotification() {
         try {
             while (in.ready()) {
                 String message = in.readLine();
+                if (message == null) {
+                    stopPollingNotification();
+                    System.out.println("서버 연결 끊김");
+                    return;
+                }
+                
                 if (message != null && message.startsWith("CANCEL_NOTIFICATION:")) {
                     String data = message.substring("CANCEL_NOTIFICATION:".length());
                     showNotification(data);
+                } else if (message != null && message.equals("LOGIN_SUCCESS")) {
+                    handleLoginSuccess();
+                    isWaiting = false;
+                    break;
                 }
             }
         } catch (IOException e) {
@@ -171,19 +196,32 @@ public class LoginController {
 
     
     public void findPassword() {
+        stopPollingNotification();
         view.dispose();
         FindPasswordController fpc = new FindPasswordController(socket, out, in, view);
     }
     
-    private void pollingNotification() {
+    private void startPollingNotification() {
+        if (pollingTimer != null) {
+            pollingTimer.stop();
+        }
+        
         int delay = 500;
         
-        Timer timer = new Timer(delay, e-> {
-            checkCancelNotification();
+        pollingTimer = new Timer(delay, e-> {
+            checkNotification();
         });
         
-        timer.setRepeats(true);
-        timer.start();
+        pollingTimer.setRepeats(true);
+        pollingTimer.start();
+    }
+    
+    private void stopPollingNotification() {
+        if (pollingTimer != null) {
+            pollingTimer.stop();
+            pollingTimer = null;
+            System.out.println("[클라이언트] 폴링 타이머 정지");
+        }
     }
     
 //    private void notificationListener() {

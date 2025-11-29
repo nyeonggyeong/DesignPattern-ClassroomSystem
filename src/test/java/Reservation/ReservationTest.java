@@ -17,6 +17,7 @@ class ReservationTest {
     @Test
     @DisplayName("빌더 패턴: 필수 값과 선택 값이 모두 정상적으로 입력되었을 때 객체 생성 성공")
     void testBuilderSuccess() {
+        System.out.println("[빌더 패턴] 객체 생성 검증");
         // given
         String name = "홍길동";
         String userType = "학생";
@@ -43,6 +44,7 @@ class ReservationTest {
         assertEquals("팀 프로젝트", reservation.getPurpose());
         assertEquals("예약확정", reservation.getStatus());
         assertEquals("목", reservation.getDayOfWeek());
+        System.out.println("[빌더 패턴] 객체 생성 검증 성공");
     }
 
     @Test
@@ -63,6 +65,7 @@ class ReservationTest {
     @Test
     @DisplayName("유효성 검사: 필수 데이터(이름)가 누락되면 예외 발생")
     void testValidationRequiredFieldMissing() {
+        System.out.println("[빌더 패턴] 이름 누락 예외 검증");
         // given & when & then
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
             new Reservation.Builder(
@@ -73,11 +76,13 @@ class ReservationTest {
         });
 
         assertEquals("이름은 필수입니다.", exception.getMessage());
+        System.out.println("[빌더 패턴] 이름 누락 예외 성공");
     }
 
     @Test
     @DisplayName("유효성 검사: 종료 시간이 시작 시간보다 빠르면 예외 발생")
     void testValidationTimeOrder() {
+        System.out.println("[빌더 패턴] 시간 검증");
         // given (종료 시간이 시작 시간보다 빠름)
         String startTime = "12:00";
         String endTime = "11:00";
@@ -91,6 +96,7 @@ class ReservationTest {
         });
 
         assertEquals("종료 시간은 시작 시간보다 이후여야 합니다", exception.getMessage());
+        System.out.println("[빌더 패턴] 시간 검증 성공");
     }
 
     @Test

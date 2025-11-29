@@ -171,7 +171,14 @@ public class Reservation {
             this.status = status != null ? status : "예약 대기";
             return this;
         }
-
+        
+        public Reservation build() {
+            validateRequired();
+            validateTimeFormat();
+            validateDateFormat();
+            return new Reservation(this);
+        }
+        
         private void validateRequired() {
             if (name == null || name.trim().isEmpty()) {
                 throw new IllegalArgumentException("이름은 필수입니다.");
@@ -227,11 +234,6 @@ public class Reservation {
             }
         }
 
-        public Reservation build() {
-            validateRequired();
-            validateTimeFormat();
-            validateDateFormat();
-            return new Reservation(this);
-        }
+        
     }
 }
