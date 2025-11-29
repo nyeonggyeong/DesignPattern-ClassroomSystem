@@ -12,3 +12,4 @@ import java.time.LocalDate;
 public interface BlockStrategy {
     void handle(LocalDate date);
 }
+

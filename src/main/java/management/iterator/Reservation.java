@@ -38,6 +38,10 @@ public class Reservation {
         return data[3];
     }
 
+    public String getRoomType() {
+        return data[5];
+    }
+
     public String getRoomNumber() {
         return data[6];
     }

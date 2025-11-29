@@ -309,9 +309,6 @@
       <Properties>
         <Property name="text" type="java.lang.String" value="&#xd559;&#xb144;&#xb3c4;/&#xd559;&#xae30;&#xbcc4;"/>
       </Properties>
-      <AccessibilityProperties>
-        <Property name="AccessibleContext.accessibleName" type="java.lang.String" value="&#xd559;&#xb144;&#xb3c4;/&#xd559;&#xae30;&#xbcc4;"/>
-      </AccessibilityProperties>
       <Events>
         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="jButton15ActionPerformed"/>
       </Events>

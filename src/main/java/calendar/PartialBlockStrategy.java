@@ -6,6 +6,7 @@ package calendar;
 
 import java.time.LocalDate;
 import java.util.List;
+import javax.swing.JOptionPane;
 
 /**
  *
@@ -78,16 +79,44 @@ public class PartialBlockStrategy implements BlockStrategy {
      * 시간대 선택 다이얼로그
      */
     private void showTimeSlot(LocalDate date, String roomType, String roomNumber) {
-        List<String> blockedSlots
-                = service.getBlockedTimeSlots(date.toString(), roomType, roomNumber);
+        List<String> blockedSlots = service.getBlockedTimeSlots(date.toString(), roomType, roomNumber);
 
         TimeSlotDialogView timeSlotDialog = new TimeSlotDialogView(blockedSlots);
         timeSlotDialog.setHandler(new TimeSlotDialogView.Handler() {
             @Override
             public void onSelect(String timeSlot) {
-                service.blockPartial(date.toString(), roomType, roomNumber, timeSlot);
-                view.refresh();
-                timeSlotDialog.close();
+                try {
+
+                    if (blockedSlots.contains(timeSlot)) {
+                        JOptionPane.showMessageDialog(
+                                null,
+                                "이미 차단된 시간대입니다: " + timeSlot,
+                                "중복 차단",
+                                JOptionPane.WARNING_MESSAGE
+                        );
+                        return;
+                    }
+
+                    service.blockPartial(date.toString(), roomType, roomNumber, timeSlot);
+                    view.refresh();
+
+                    JOptionPane.showMessageDialog(
+                            null,
+                            "부분 차단 완료: " + roomType + " / " + roomNumber + " / " + timeSlot,
+                            "성공",
+                            JOptionPane.INFORMATION_MESSAGE
+                    );
+
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(
+                            null,
+                            "부분 차단에 실패했습니다.\n" + e.getMessage(),
+                            "오류",
+                            JOptionPane.ERROR_MESSAGE
+                    );
+                } finally {
+                    timeSlotDialog.close();
+                }
             }
 
             @Override
