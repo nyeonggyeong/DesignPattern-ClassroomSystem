@@ -17,6 +17,7 @@ import Reservation.ReservationGUIController;
 import Reservation.ReservationView;
 
 public class UserMainController {
+    private Timer pollingTimer;
 
     private UserMainModel model;
     private UserMainView view;
@@ -71,6 +72,7 @@ public class UserMainController {
         }
 
         view.setVisible(true);
+        this.startPollingNotification();
     }
 
     private void initializeNotificationSystem() {
@@ -180,5 +182,60 @@ public class UserMainController {
 
     public NotificationButton getNotificationButton() {
         return notificationButton;
+    }
+    
+    private void startPollingNotification() {
+        if (pollingTimer != null) {
+            pollingTimer.stop();
+        }
+        
+        int delay = 500;
+        
+        pollingTimer = new Timer(delay, e-> {
+            checkNotification();
+        });
+        
+        pollingTimer.setRepeats(true);
+        pollingTimer.start();
+    }
+    
+    private void stopPollingNotification() {
+        if (pollingTimer != null) {
+            pollingTimer.stop();
+            pollingTimer = null;
+        }
+    }
+    
+    public void checkNotification() {
+        try {
+            while (in.ready()) {
+                String msg = in.readLine();
+                if (msg == null) {
+                    stopPollingNotification();
+                    return;
+                }
+                if (msg != null && msg.startsWith("CANCEL_NOTIFICATION:")) {
+                    String data = msg.substring("CANCEL_NOTIFICATION:".length());
+                    showNotification(data);
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("에러:" + e.getMessage());
+        }
+    }
+    
+    public void showNotification(String data) {
+        if (data != null && !data.isEmpty()) {
+            String[] notifications = data.split(";");
+            for (String notification : notifications) {
+                String[] parts = notification.split(",");
+                StringBuilder sb = new StringBuilder();
+                sb.append("교수님의 예약으로 인해 다음 예약이 취소되었습니다.\n");
+                sb.append(String.format("%s님의 %s\n", parts[0], parts[2]));
+                sb.append(String.format("시간: %s", parts[3]));
+                JOptionPane.showMessageDialog(null, sb.toString(), "예약 취소 알림", JOptionPane.WARNING_MESSAGE);
+            }
+        }
     }
 }

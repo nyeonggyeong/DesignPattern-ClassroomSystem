@@ -16,3 +16,6 @@ duatmddnr, .
 dhkdrjs, .
 duatmddnr, .
 duatmddnr, .
+test1, d
+test1, d
+test2, 00

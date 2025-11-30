@@ -16,7 +16,8 @@ import java.awt.*;
 import java.awt.event.ActionListener;
 
 public class UserMainView extends JFrame {
-
+    private String userName;
+    
     private JLabel welcomeLabel;
     private JLabel dateLabel;
     private JButton viewReservationsButton;
@@ -144,6 +145,7 @@ public class UserMainView extends JFrame {
     // 사용자 환영 메시지
     public void setWelcomeMessage(String userId) {
         welcomeLabel.setText("환영합니다, " + userId + "님");
+        this.userName = userId;
     }
 
     public void addViewReservationsListener(ActionListener listener) {

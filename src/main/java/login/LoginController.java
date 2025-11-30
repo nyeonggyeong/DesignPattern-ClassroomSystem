@@ -224,22 +224,6 @@ public class LoginController {
         }
     }
     
-//    private void notificationListener() {
-//        listener = new Thread(() -> {
-//            try {
-//                String msg;
-//                while ((msg = in.readLine()) != null) {
-//                    if(msg.startsWith("CANCEL_NOTIFICATION:")) {
-//                        String data = msg.substring("CANCEL_NOTIFICATION:".length());
-//                        showNotification(data);
-//                    }
-//                }
-//            } catch (IOException e) {
-//                System.out.println("에러: " + e.getMessage());
-//            }
-//        });
-//        listener.setDaemon(true);
-//        listener.start();
-//    }
+
 
 }
